@@ -96,33 +96,43 @@ export default function App() {
       noise.connect(filter).connect(env).connect(out); noise.start(now); noise.stop(now + (row === 1 ? 0.16 : 0.06))
     }
   }
-  const triggerNote = (ctx: AudioContext, pitch: number) => {
+  const triggerNote = (ctx: AudioContext, pitch: number, level = 1) => {
     const now = ctx.currentTime, osc = ctx.createOscillator(), env = ctx.createGain(), filter = ctx.createBiquadFilter()
     osc.type = 'triangle'; osc.frequency.value = 440 * Math.pow(2, ((60 + pitch) - 69) / 12)
     filter.type = 'lowpass'; filter.frequency.value = 2400
-    env.gain.setValueAtTime(0.0001, now); env.gain.exponentialRampToValueAtTime(0.14 * master / 100, now + 0.025); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.22)
+    env.gain.setValueAtTime(0.0001, now); env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * level, now + 0.025); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.22)
     osc.connect(filter).connect(env).connect(ctx.destination); osc.start(now); osc.stop(now + 0.23)
   }
+  const clipActiveAt = (lane: number, bar: number) => clips.some(c => c.lane === lane && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
   useEffect(() => {
     if (!playing) return
     const ctx = audioContext || new window.AudioContext()
     if (!audioContext) setAudioContext(ctx)
     void ctx.resume()
     const tick = () => {
-      const step = stepRef.current
-      steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
-      notes.filter(note => note.step === step).forEach(note => triggerNote(ctx, note.pitch))
-      setPlayheadStep(step); stepRef.current = (step + 1) % 16
+      const position = stepRef.current
+      const bar = Math.floor(position / 16)
+      const step = position % 16
+      if (clipActiveAt(0, bar)) steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
+      if (clipActiveAt(1, bar) && [0, 6, 8, 14].includes(step)) triggerNote(ctx, step % 8 === 0 ? 0 : 3, 0.72)
+      if (clipActiveAt(3, bar)) notes.filter(note => note.step === step).forEach(note => triggerNote(ctx, note.pitch))
+      const reference = clips.find(c => c.lane === 2 && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
+      const audio = audioElement.current
+      if (audio && reference) {
+        const expectedTime = Math.max(0, (bar - (reference.startBar ?? 0)) * 4 * 60 / bpm + step * 60 / bpm / 4)
+        if (audio.paused) { audio.currentTime = expectedTime; void audio.play().catch(() => notify('Browser blocked reference playback. Press Play again to allow audio.')) }
+        else if (Math.abs(audio.currentTime - expectedTime) > 0.3) audio.currentTime = Math.min(expectedTime, Number.isFinite(audio.duration) ? audio.duration : expectedTime)
+      } else if (audio && !audio.paused) audio.pause()
+      setPlayheadStep(position); stepRef.current = (position + 1) % 128
     }
     tick()
     const timer = window.setInterval(tick, 60000 / bpm / 4)
     return () => window.clearInterval(timer)
-  }, [playing, bpm, steps, notes, master, audioContext])
+  }, [playing, bpm, steps, notes, clips, master, audioContext])
   useEffect(() => {
     const audio = audioElement.current
     if (!audio) return
-    if (playing) { audio.currentTime = 0; void audio.play().catch(() => notify('Browser blocked reference playback. Press Play again to allow audio.')) }
-    else { audio.pause(); audio.currentTime = 0 }
+    if (!playing) { audio.pause() }
   }, [playing, audioUrl])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -230,7 +240,7 @@ export default function App() {
       <div className="top-actions"><div className="project-name"><i className="status-dot"/> Untitled Project <ChevronDown size={14}/></div><button className="icon-button" onClick={() => notify('Audio uses your browser output. Master volume controls generated sounds.')}><Settings2 size={17}/></button><button className="secondary-button" onClick={() => projectInput.current?.click()}><FolderOpen size={15}/> Open project</button><input ref={projectInput} type="file" accept="application/json,.json" hidden onChange={e=>{void loadProject(e.target.files?.[0]);e.currentTarget.value=''}}/><button className="save-button" onClick={saveProject}><Save size={15}/> Save project</button></div>
     </header>
     <div className="transport">
-      <div className="transport-left"><button className="transport-icon" onClick={() => {setPlaying(false);stepRef.current=0;setPlayheadStep(0);notify('Playback stopped.')}} title="Stop"><Square size={13} fill="currentColor"/></button><button className="play-button" onClick={() => setPlaying(v => !v)} title="Play or pause">{playing?<Pause size={17} fill="currentColor"/>:<Play size={17} fill="currentColor"/>}</button><button className="transport-icon" onClick={() => {stepRef.current=0;setPlayheadStep(0);notify('Returned to start.')}}><span>↶</span></button><div className="transport-divider"/><div className="bpm-control"><span>BPM</span><input aria-label="Tempo BPM" type="number" min="40" max="240" value={bpm} onChange={e=>setBpm(Math.max(40,Math.min(240,Number(e.target.value)||122)))}/><div className="bpm-nudge"><button onClick={()=>setBpm(v=>Math.min(240,v+1))}>⌃</button><button onClick={()=>setBpm(v=>Math.max(40,v-1))}>⌄</button></div></div><div className="key-pill"><span>KEY</span><strong>A min</strong><ChevronDown size={12}/></div><div className="time-readout">{(()=>{const seconds=Math.floor(playheadStep*(60/bpm/4));return '00:'+String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')})()}</div></div>
+      <div className="transport-left"><button className="transport-icon" onClick={() => {setPlaying(false);stepRef.current=0;setPlayheadStep(0);notify('Playback stopped.')}} title="Stop"><Square size={13} fill="currentColor"/></button><button className="play-button" onClick={() => setPlaying(v => !v)} title="Play or pause">{playing?<Pause size={17} fill="currentColor"/>:<Play size={17} fill="currentColor"/>}</button><button className="transport-icon" onClick={() => {stepRef.current=0;setPlayheadStep(0);notify('Returned to start.')}}><span>↶</span></button><div className="transport-divider"/><div className="bpm-control"><span>BPM</span><input aria-label="Tempo BPM" type="number" min="40" max="240" value={bpm} onChange={e=>setBpm(Math.max(40,Math.min(240,Number(e.target.value)||122)))}/><div className="bpm-nudge"><button onClick={()=>setBpm(v=>Math.min(240,v+1))}>⌃</button><button onClick={()=>setBpm(v=>Math.max(40,v-1))}>⌄</button></div></div><div className="key-pill"><span>KEY</span><strong>A min</strong><ChevronDown size={12}/></div><div className="time-readout">{(()=>{const seconds=Math.floor(playheadStep*(60/bpm/4));return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')+':'+String(Math.floor((seconds%1)*100)).padStart(2,'0')})()}</div></div>
       <div className="transport-center"><span className="status-dot green"/> Audio engine <span className="status-label">{playing ? "Playing pattern" : "Ready"}</span></div>
       <div className="transport-right"><HeadphonesFallback/><span>MASTER</span><input aria-label="Master volume" type="range" min="0" max="100" value={master} onChange={e=>setMaster(Number(e.target.value))}/><span className="volume-value">{master}%</span></div>
     </div>
