@@ -31,6 +31,7 @@ export default function App() {
   ])
   const [dragging, setDragging] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const projectInput = useRef<HTMLInputElement>(null)
 
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null)
   const [audioUrl, setAudioUrl] = useState('')
@@ -174,10 +175,50 @@ export default function App() {
     audio.load()
   }
   const saveProject = () => {
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, prompt }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
     notify('Project data exported.')
+  }
+  const loadProject = async (file?: File) => {
+    if (!file) return
+    try {
+      const parsed: unknown = JSON.parse(await file.text())
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid project')
+      const data = parsed as Record<string, unknown>
+      if (data.app !== 'AfroStudio AI' || typeof data.bpm !== 'number' || !Array.isArray(data.clips) || !Array.isArray(data.steps) || !Array.isArray(data.notes)) {
+        throw new Error('This is not a supported AfroStudio project file.')
+      }
+      const validSteps = data.steps.length === 4 && data.steps.every(row => Array.isArray(row) && row.length === 16 && row.every(value => typeof value === 'boolean'))
+      const validClips = data.clips.every((clip: unknown) => {
+        if (!clip || typeof clip !== 'object') return false
+        const item = clip as Record<string, unknown>
+        return typeof item.id === 'number' && typeof item.name === 'string' && typeof item.duration === 'number' &&
+          typeof item.color === 'string' && typeof item.lane === 'number' && item.lane >= 0 && item.lane <= 3
+      })
+      const validNotes = data.notes.every((note: unknown) => {
+        if (!note || typeof note !== 'object') return false
+        const item = note as Record<string, unknown>
+        return typeof item.id === 'number' && typeof item.step === 'number' && item.step >= 0 && item.step < 16 &&
+          typeof item.pitch === 'number' && item.pitch >= 0 && item.pitch < 12
+      })
+      if (!validSteps || !validClips || !validNotes) throw new Error('Project data is incomplete or damaged.')
+      setPlaying(false)
+      audioElement.current?.pause()
+      setAudioUrl('')
+      setReferenceName(typeof data.referenceName === 'string' ? data.referenceName : '')
+      setBpm(Math.max(40, Math.min(240, data.bpm)))
+      setClips(data.clips as Clip[])
+      setSteps(data.steps as boolean[][])
+      setNotes(data.notes as {id:number;step:number;pitch:number}[])
+      setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
+      if (typeof data.prompt === 'string') setPrompt(data.prompt)
+      stepRef.current = 0
+      setPlayheadStep(0)
+      notify('Project loaded. Re-import its reference audio if needed.')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not open this project file.')
+    }
   }
   const nav = [{ name: 'Playlist', Icon: Layers3 }, { name: 'Piano Roll', Icon: Music2 }, { name: 'Channel Rack', Icon: Drum }, { name: 'Mixer', Icon: SlidersHorizontal }]
 
@@ -186,7 +227,7 @@ export default function App() {
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><AudioWaveform size={23}/></div><div><div className="brand-name">AfroStudio <span>AI</span></div><div className="brand-sub">MAKE YOUR OWN RHYTHM</div></div></div>
       <nav className="top-menu"><button className="menu-link selected" onClick={() => setView('Playlist')}>Studio</button><button className="menu-link" onClick={() => setView('Reference Track')}>AI Lab <i className="new-dot"/></button><button className="menu-link" onClick={() => setView('Instruments')}>Sound Library</button></nav>
-      <div className="top-actions"><div className="project-name"><i className="status-dot"/> Untitled Project <ChevronDown size={14}/></div><button className="icon-button" onClick={() => notify('Audio uses your browser output. Master volume controls generated sounds.')}><Settings2 size={17}/></button><button className="save-button" onClick={saveProject}><Save size={15}/> Save project</button></div>
+      <div className="top-actions"><div className="project-name"><i className="status-dot"/> Untitled Project <ChevronDown size={14}/></div><button className="icon-button" onClick={() => notify('Audio uses your browser output. Master volume controls generated sounds.')}><Settings2 size={17}/></button><button className="secondary-button" onClick={() => projectInput.current?.click()}><FolderOpen size={15}/> Open project</button><input ref={projectInput} type="file" accept="application/json,.json" hidden onChange={e=>{void loadProject(e.target.files?.[0]);e.currentTarget.value=''}}/><button className="save-button" onClick={saveProject}><Save size={15}/> Save project</button></div>
     </header>
     <div className="transport">
       <div className="transport-left"><button className="transport-icon" onClick={() => {setPlaying(false);stepRef.current=0;setPlayheadStep(0);notify('Playback stopped.')}} title="Stop"><Square size={13} fill="currentColor"/></button><button className="play-button" onClick={() => setPlaying(v => !v)} title="Play or pause">{playing?<Pause size={17} fill="currentColor"/>:<Play size={17} fill="currentColor"/>}</button><button className="transport-icon" onClick={() => {stepRef.current=0;setPlayheadStep(0);notify('Returned to start.')}}><span>↶</span></button><div className="transport-divider"/><div className="bpm-control"><span>BPM</span><input aria-label="Tempo BPM" type="number" min="40" max="240" value={bpm} onChange={e=>setBpm(Math.max(40,Math.min(240,Number(e.target.value)||122)))}/><div className="bpm-nudge"><button onClick={()=>setBpm(v=>Math.min(240,v+1))}>⌃</button><button onClick={()=>setBpm(v=>Math.max(40,v-1))}>⌄</button></div></div><div className="key-pill"><span>KEY</span><strong>A min</strong><ChevronDown size={12}/></div><div className="time-readout">{(()=>{const seconds=Math.floor(playheadStep*(60/bpm/4));return '00:'+String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')})()}</div></div>
