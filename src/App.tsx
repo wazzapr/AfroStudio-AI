@@ -40,13 +40,13 @@ export default function App() {
   const [playheadStep, setPlayheadStep] = useState(0)
   const audioElement = useRef<HTMLAudioElement | null>(null)
   const stepRef = useRef(0)
-  type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number}[]; master:number }
+  type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number}[]; master:number; channelLevels:number[] }
   const undoStack = useRef<Snapshot[]>([])
   const redoStack = useRef<Snapshot[]>([])
   const applyingHistory = useRef(false)
   const lastSnapshot = useRef<Snapshot | null>(null)
-  const projectRef = useRef<Snapshot>({ bpm, clips, steps, notes, master })
-  const currentSnapshot = () => ({ bpm, clips, steps, notes, master })
+  const projectRef = useRef<Snapshot>({ bpm, clips, steps, notes, master, channelLevels })
+  const currentSnapshot = () => ({ bpm, clips, steps, notes, master, channelLevels })
   useEffect(() => {
     const current = currentSnapshot()
     projectRef.current = current
@@ -58,10 +58,10 @@ export default function App() {
       redoStack.current = []
       lastSnapshot.current = current
     }
-  }, [bpm, clips, steps, notes, master])
+  }, [bpm, clips, steps, notes, master, channelLevels])
   const applySnapshot = (snapshot: Snapshot) => {
     applyingHistory.current = true
-    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master)
+    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master); setChannelLevels(snapshot.channelLevels)
     projectRef.current = snapshot; lastSnapshot.current = snapshot
   }
   const undo = () => {
