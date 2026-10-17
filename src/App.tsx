@@ -136,8 +136,9 @@ export default function App() {
   useEffect(() => {
     const audio = audioElement.current
     if (!audio) return
-    if (!playing) { audio.pause() }
-  }, [playing, audioUrl])
+    audio.volume = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
+    if (!playing) audio.pause()
+  }, [playing, audioUrl, master, channelLevels])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
