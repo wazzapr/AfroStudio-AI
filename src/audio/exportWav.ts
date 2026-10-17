@@ -8,12 +8,13 @@ type ExportOptions = {
   steps: boolean[][]
   notes: ExportNote[]
   clips: ExportClip[]
+  channelLevels?: number[]
   bars?: number
 }
 
-function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number) {
+function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number, channelLevel: number) {
   const out = ctx.createGain()
-  out.gain.value = Math.max(0, Math.min(1, master / 100)) * 0.8
+  out.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevel / 100)) * 0.8
   out.connect(ctx.destination)
 
   if (row === 0 || row === 3) {
@@ -49,7 +50,7 @@ function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: nu
   noise.stop(time + (row === 1 ? 0.16 : 0.06))
 }
 
-function addBass(ctx: OfflineAudioContext, time: number, pitch: number, master: number) {
+function addBass(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number) {
   const osc = ctx.createOscillator()
   const env = ctx.createGain()
   const filter = ctx.createBiquadFilter()
@@ -59,14 +60,14 @@ function addBass(ctx: OfflineAudioContext, time: number, pitch: number, master: 
   filter.frequency.setValueAtTime(420, time)
   filter.frequency.exponentialRampToValueAtTime(180, time + 0.18)
   env.gain.setValueAtTime(0.0001, time)
-  env.gain.exponentialRampToValueAtTime(0.16 * master / 100, time + 0.008)
+  env.gain.exponentialRampToValueAtTime(0.16 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)), time + 0.008)
   env.gain.exponentialRampToValueAtTime(0.0001, time + 0.19)
   osc.connect(filter).connect(env).connect(ctx.destination)
   osc.start(time)
   osc.stop(time + 0.2)
 }
 
-function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number) {
+function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number) {
   const osc = ctx.createOscillator()
   const env = ctx.createGain()
   const filter = ctx.createBiquadFilter()
@@ -75,7 +76,7 @@ function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: 
   filter.type = 'lowpass'
   filter.frequency.value = 2400
   env.gain.setValueAtTime(0.0001, time)
-  env.gain.exponentialRampToValueAtTime(0.14 * master / 100, time + 0.025)
+  env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)), time + 0.025)
   env.gain.exponentialRampToValueAtTime(0.0001, time + 0.22)
   osc.connect(filter).connect(env).connect(ctx.destination)
   osc.start(time)
@@ -117,7 +118,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([output], { type: 'audio/wav' })
 }
 
-export async function exportArrangementWav({ bpm, master, steps, notes, clips, bars = 8 }: ExportOptions): Promise<void> {
+export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], bars = 8 }: ExportOptions): Promise<void> {
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
@@ -136,14 +137,14 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, b
     const bar = Math.floor(step / 16)
     if (activeAt(0, bar)) {
       steps.forEach((row, rowIndex) => {
-        if (row[patternStep]) addDrum(ctx, time, rowIndex, master)
+        if (row[patternStep]) addDrum(ctx, time, rowIndex, master, channelLevels[rowIndex === 0 ? 0 : 1] ?? 100)
       })
     }
     if (activeAt(1, bar) && [0, 6, 8, 14].includes(patternStep)) {
-      addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, master)
+      addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, master, channelLevels[2] ?? 100)
     }
     if (activeAt(3, bar)) {
-      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master))
+      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100))
     }
   }
 
