@@ -132,7 +132,7 @@ export default function App() {
     tick()
     const timer = window.setInterval(tick, 60000 / bpm / 4)
     return () => window.clearInterval(timer)
-  }, [playing, bpm, steps, notes, clips, master, audioContext])
+  }, [playing, bpm, steps, notes, clips, master, channelLevels, audioContext])
   useEffect(() => {
     const audio = audioElement.current
     if (!audio) return
