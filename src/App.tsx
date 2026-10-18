@@ -47,7 +47,7 @@ export default function App() {
   const [localAiMessage, setLocalAiMessage] = useState('No local AI engine has been configured yet.')
   const [aceStepAvailable, setAceStepAvailable] = useState(false)
   const [aiAudioGenerating, setAiAudioGenerating] = useState(false)
-  const [prompt, setPrompt] = useState('Warm, organic Afro House groove with deep bass and sunset atmosphere')
+  const [prompt, setPrompt] = useState('Warm, organic Afro House with soulful expressive vocals, deep rolling bass, hypnotic hand percussion, rich analog synths, evolving chords, natural dynamics, and an emotional sunset atmosphere. Original melody and lyrics, polished full-song arrangement.')
   const [generationElements, setGenerationElements] = useState<string[]>(['Drums','Bass','Melody'])
   const [selectedClipId, setSelectedClipId] = useState<number | null>(null)
   const [clips, setClips] = useState<Clip[]>([
@@ -291,8 +291,8 @@ export default function App() {
             const capabilities = statusData.capabilities && typeof statusData.capabilities === 'object' ? statusData.capabilities as Record<string, unknown> : null
             const provider = statusData.provider && typeof statusData.provider === 'object' ? statusData.provider as Record<string, unknown> : null
             setAceStepAvailable(provider?.available === true && capabilities?.music_generation === true)
-            if (model?.ready === true && capabilities?.music_generation === true) {
-              statusMessage = 'A model reports ready. Audio generation still needs to be tested in the app.'
+            if (provider?.available === true && capabilities?.music_generation === true) {
+              statusMessage = 'ACE-Step API is reachable. Model readiness is not verified until a generation succeeds.'
             } else if (model?.installed === false) {
               statusMessage = 'Local bridge connected, but no music model is installed yet. This connection does not generate audio.'
             } else if (capabilities?.music_generation === false) {
