@@ -10,6 +10,7 @@ The project is an early, actively developed browser-based studio foundation. The
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
 - 16-step Channel Rack and editable Piano Roll.
 - Mixer level controls and working mute toggles for the available preview channels.
+- Starter playback effects that can be toggled on/off: low-cut filter, dynamics compressor, short echo, and tempo-synced delay.
 - JSON project export/import and WAV arrangement export.
 - Local procedural Afro House idea generation (patterns and notes); this is not a trained AI music-generation model.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, and save.
@@ -19,7 +20,7 @@ The project is an early, actively developed browser-based studio foundation. The
 - This is not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - Imported reference audio is not yet analyzed for BPM, key, stems, or musical structure.
 - AI reference-track controls currently help shape locally generated patterns; they do not generate a full song from uploaded audio.
-- Effects are not yet connected as a full processing chain.
+- The built-in effects are lightweight starter processing, not a polished per-channel effects rack; reverb is currently approximated with a short echo, and effect parameters/routing are not yet editable.
 - VST3/plugin hosting, sample library management, automation, advanced MIDI editing, and a low-latency desktop audio engine remain future milestones.
 - The app is currently a Vite web app. Desktop packaging is a later milestone.
 
