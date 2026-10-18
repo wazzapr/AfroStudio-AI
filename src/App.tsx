@@ -50,6 +50,18 @@ export default function App() {
   const audioElement = useRef<HTMLAudioElement | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   useEffect(() => {
+    const url = audioUrl
+    const audio = audioElement.current
+    return () => {
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute('src')
+        audio.load()
+      }
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [audioUrl])
+  useEffect(() => {
     const move = (event: PointerEvent) => {
       const drag = clipResizeRef.current
       if (!drag || drag.pointerId !== event.pointerId) return
