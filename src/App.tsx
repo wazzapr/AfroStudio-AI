@@ -624,7 +624,9 @@ export default function App() {
       audio.onended = () => setReferencePreviewing(false)
       const barDuration = 4 * 60 / bpm; const clipStart = Math.max(0, Math.min(15, Math.floor(startBar))); const clipBars = Math.max(1, Math.min(16 - clipStart, Math.ceil(duration / barDuration))); setClips(old => [...old.filter(c => !(c.lane === 2 && c.name === 'Reference · drop a song')), { id: Date.now(), name: file.name, duration: clipBars, color: colors[2], lane: 2, startBar: clipStart }])
       setDetectedBpm(null)
-      setAnalysis(['Audio loaded · ' + Math.floor(duration / 60) + ':' + String(Math.floor(duration % 60)).padStart(2, '0'), 'Running lightweight local tempo analysis. Key detection, stem separation and AI audio remixing are not available yet.'])
+      setReferenceGroove(null)
+      setDetectedBpm(null)
+      setAnalysis(['Audio loaded · ' + Math.floor(duration / 60) + ':' + String(Math.floor(duration % 60)).padStart(2, '0'), 'Running lightweight local tempo and transient-profile analysis. Key detection, stem separation and AI audio remixing are not available yet.'])
       void analyzeReferenceLocally(file, requestId)
       notify('Reference imported. Local tempo analysis started.')
     }
