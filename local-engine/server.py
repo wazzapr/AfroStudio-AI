@@ -153,10 +153,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {
                 "status": "ok",
                 "service": "afrostudio-local-engine",
-                "model": {"installed": provider["available"], "ready": provider["available"], "name": "ACE-Step 1.5" if provider["available"] else None},
+                "model": {"installed": None, "ready": False, "name": "ACE-Step 1.5 API (model readiness unverified)" if provider["available"] else None},
                 "provider": provider,
                 "capabilities": {"health_check": True, "music_generation": provider["available"], "reference_audio_upload": False},
-                "message": provider["message"] if provider["available"] else "Bridge is running; start a compatible local ACE-Step API to enable AI audio generation."
+                "message": "ACE-Step API is reachable; model readiness is not verified until a generation succeeds." if provider["available"] else "Bridge is running; start a compatible local ACE-Step API to enable AI audio generation."
             })
         elif self.path.startswith("/tasks/"):
             task_id = self.path.split("/", 2)[2]
