@@ -16,7 +16,7 @@ The project is an early, actively developed browser-based studio foundation. Cur
 
 ## Windows setup status
 
-The app is still a Vite web app; a packaged Windows installer is not available yet. The \`local-engine/setup-windows.ps1\` helper is an early setup step: it checks Python, disk space, and NVIDIA GPU information, prepares the local bridge environment, and can start the bridge.
+A Windows desktop build is now being added with Electron. The Windows Installer workflow builds a setup `.exe` and publishes it as a downloadable GitHub Actions artifact when the build succeeds. The \`local-engine/setup-windows.ps1\` helper is an early setup step: it checks Python, disk space, and NVIDIA GPU information, prepares the local bridge environment, and can start the bridge.
 
 **The helper does not install ACE-Step or download AI model weights yet.** We must verify a safe, compatible installation route before automating multi-gigabyte downloads. The current PC described by the project owner has a GTX 750 Ti with 2 GB VRAM; ACE-Step 1.5's documented low-memory recommendation is at least 4 GB, so compatibility cannot be promised. No paid generation API is required by the design.
 
@@ -25,11 +25,13 @@ The app is still a Vite web app; a packaged Windows installer is not available y
 - Not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - AI full-song generation from uploaded audio requires a compatible local model service; the bridge alone does not generate music.
 - VST3/plugin hosting, sample library management, automation, and a low-latency desktop audio engine remain future milestones.
-- The app is currently a Vite web app. Desktop packaging and a guided installer remain future milestones.
+- The desktop installer packages the studio interface and local bridge source, but it does not bundle Python, install an AI model, or guarantee AI generation on every PC. The installer is an early build and still needs testing.
 
 ## Try it on Windows
 
-A packaged `.exe` installer is **not available yet**. To try the latest source on Windows:
+To get the Windows installer, open [GitHub Actions](https://github.com/wazzapr/AfroStudio-AI/actions/workflows/windows-installer.yml), select the latest successful **Windows installer** run, and download the `AfroStudio-AI-Windows-Installer` artifact. Extract the artifact ZIP and run the `.exe` inside it. This installer is an early build and does not install the AI model. If the workflow has not completed successfully yet, use the source ZIP steps below as a temporary fallback.
+
+To try the latest source on Windows without the installer:
 
 1. Download the [latest project ZIP](https://github.com/wazzapr/AfroStudio-AI/archive/refs/heads/feat/studio-foundation.zip).
 2. Extract the ZIP to a normal folder, for example `Desktop\AfroStudio-AI`.
