@@ -16,6 +16,7 @@ The project is an early, actively developed browser-based studio foundation. The
 - Local procedural Afro House idea generation (patterns and notes); this is not a trained AI music-generation model.
 - Experimental reference-audio analysis estimates tempo and a rough transient-density profile locally; the profile and Groove, Style, and Originality controls influence generated hat/percussion patterns and note choices. This is a lightweight heuristic, not trained AI, genre recognition, key detection, or audio-to-audio remixing.
 - Reference Track includes a configurable local-engine health check, designed to test a future local AI service without sending audio to a paid API. It only checks a `/health` endpoint returning `{\"status\":\"ok\"}` or `{\"status\":\"healthy\"}`; it does not install a model or generate audio.
+- Experimental Python localhost bridge in `local-engine/` provides `/health` and `/status` using only the Python standard library. It binds to `127.0.0.1`, reports honestly that no model is installed, and does not generate music yet. See `local-engine/README.md` for the optional connection test.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting the selected Playlist clip or Piano Roll note. Ctrl/Cmd+B duplicates the selected Playlist clip into the next available bars, or duplicates clips into the second half when none is selected.
 
 ## Known limitations
