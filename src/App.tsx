@@ -679,7 +679,8 @@ export default function App() {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
     const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-    const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
+    const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     notify('Project data exported.')
   }
   const loadProject = async (file?: File) => {
