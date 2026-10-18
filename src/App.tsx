@@ -238,9 +238,10 @@ export default function App() {
       const current = playbackStateRef.current
       // Follow the real arrangement length instead of always stopping after eight bars.
       // The empty reference placeholder is only a drop target, not a 16-bar song.
-      const arrangementBars = Math.max(8, Math.min(16, Math.ceil(Math.max(8, ...current.clips
+      const lastClipBar = current.clips
         .filter(clip => !(clip.lane === 2 && clip.name === 'Reference · drop a song'))
-        .map(clip => (clip.startBar ?? 0) + Math.max(1, clip.duration)))))
+        .reduce((end, clip) => Math.max(end, (clip.startBar ?? 0) + Math.max(1, clip.duration)), 8)
+      const arrangementBars = Math.max(8, Math.min(16, Math.ceil(lastClipBar)))
       const arrangementEndStep = arrangementBars * 16
       if (clipActiveAt(0, bar)) current.steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
       if (clipActiveAt(1, bar) && [0, 6, 8, 14].includes(step)) triggerNote(ctx, step % 8 === 0 ? 0 : 3, 0.72, 2)
