@@ -142,12 +142,17 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
   if (referenceAudio && !mutedChannels[5] && !mutedChannels[0]) {
     const referenceClip = clips.find(clip => clip.lane === 2)
     if (referenceClip) {
-      const source = ctx.createBufferSource()
-      const gain = ctx.createGain()
-      source.buffer = referenceAudio
-      gain.gain.value = Math.max(0, Math.min(1, effectiveMaster / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
-      source.connect(gain).connect(ctx.destination)
-      source.start(Math.max(0, (referenceClip.startBar ?? 0) * 4 * 60 / safeBpm))
+      const startTime = Math.max(0, (referenceClip.startBar ?? 0) * 4 * 60 / safeBpm)
+      const clipDuration = Math.max(1, Math.ceil(referenceClip.duration)) * 4 * 60 / safeBpm
+      const playableDuration = Math.min(referenceAudio.duration, clipDuration, duration - startTime)
+      if (playableDuration > 0 && startTime < duration) {
+        const source = ctx.createBufferSource()
+        const gain = ctx.createGain()
+        source.buffer = referenceAudio
+        gain.gain.value = Math.max(0, Math.min(1, effectiveMaster / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
+        source.connect(gain).connect(ctx.destination)
+        source.start(startTime, 0, playableDuration)
+      }
     }
   }
   const activeAt = (lane: number, bar: number) => clips.some(clip => {
