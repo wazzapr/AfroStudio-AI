@@ -70,6 +70,60 @@ export default function App() {
   const audioImportRequestRef = useRef(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   const sampleLibraryLoaded = useRef(false)
+  const autosaveReady = useRef(false)
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('afrostudio-project-autosave-v1')
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          const data = parsed as Record<string, unknown>
+          const validSteps = Array.isArray(data.steps) && data.steps.length === 4 && data.steps.every(row => Array.isArray(row) && row.length === 16 && row.every(value => typeof value === 'boolean'))
+          const validClips = Array.isArray(data.clips) && data.clips.every((clip: unknown) => {
+            if (!clip || typeof clip !== 'object') return false
+            const item = clip as Record<string, unknown>
+            return typeof item.id === 'number' && typeof item.name === 'string' && typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 1 && item.duration <= 64 && typeof item.color === 'string' && typeof item.lane === 'number' && Number.isInteger(item.lane) && item.lane >= 0 && item.lane <= 3 && (item.startBar === undefined || (typeof item.startBar === 'number' && Number.isInteger(item.startBar) && item.startBar >= 0 && item.startBar <= 15))
+          })
+          const validNotes = Array.isArray(data.notes) && data.notes.every((note: unknown) => {
+            if (!note || typeof note !== 'object') return false
+            const item = note as Record<string, unknown>
+            return typeof item.id === 'number' && typeof item.step === 'number' && item.step >= 0 && item.step < 16 && typeof item.pitch === 'number' && item.pitch >= 0 && item.pitch < 12 && (item.duration === undefined || (typeof item.duration === 'number' && item.duration >= 1 && item.duration <= 16)) && (item.velocity === undefined || (typeof item.velocity === 'number' && item.velocity >= 1 && item.velocity <= 127))
+          })
+          if (data.app === 'AfroStudio AI' && typeof data.bpm === 'number' && validSteps && validClips && validNotes) {
+            setBpm(Math.max(40, Math.min(240, data.bpm)))
+            setClips(data.clips as Clip[])
+            setSteps(data.steps as boolean[][])
+            setNotes((data.notes as {id:number;step:number;pitch:number;duration?:number;velocity?:number}[]).map(note => ({...note, duration: note.duration ?? 2, velocity: note.velocity ?? 100})))
+            setReferenceName(typeof data.referenceName === 'string' ? data.referenceName : '')
+            setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
+            setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78,66,72,55,60])
+            setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
+            setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
+            setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture'].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Soft Keys')
+            if (typeof data.prompt === 'string') setPrompt(data.prompt)
+            if (Array.isArray(data.generationElements) && data.generationElements.every(value => ['Drums','Bass','Melody','Chords','Atmosphere'].includes(String(value)))) setGenerationElements(data.generationElements as string[])
+            if (Array.isArray(data.rowSampleNames) && data.rowSampleNames.length === 4 && data.rowSampleNames.every(name => typeof name === 'string')) setRowSampleIds(['','','',''])
+          }
+        }
+      }
+    } catch {
+      // Storage can be disabled or full; keep the starter project usable.
+    }
+    autosaveReady.current = true
+  }, [])
+  useEffect(() => {
+    if (!autosaveReady.current) return
+    const timeout = window.setTimeout(() => {
+      try {
+        const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
+      } catch {
+        // Do not interrupt music work if browser storage is unavailable or full.
+      }
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleIds, drumSamples])
   useEffect(() => {
     let cancelled = false
     const restoreSamples = async () => {
