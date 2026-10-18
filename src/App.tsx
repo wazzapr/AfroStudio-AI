@@ -13,6 +13,7 @@ export default function App() {
   const [master, setMaster] = useState(78)
   const [channelLevels, setChannelLevels] = useState([78, 66, 72, 55, 60])
   const [mutedChannels, setMutedChannels] = useState<boolean[]>([false, false, false, false, false, false])
+  const [enabledEffects, setEnabledEffects] = useState<boolean[]>([false, false, false, false])
   const [toast, setToast] = useState('')
   const [referenceName, setReferenceName] = useState('')
   const [analysis, setAnalysis] = useState<string[]>([])
@@ -44,8 +45,8 @@ export default function App() {
   const audioElement = useRef<HTMLAudioElement | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const stepRef = useRef(0)
-  const playbackStateRef = useRef({ clips, steps, notes, master, channelLevels, mutedChannels })
-  playbackStateRef.current = { clips, steps, notes, master, channelLevels, mutedChannels }
+  const playbackStateRef = useRef({ clips, steps, notes, master, channelLevels, mutedChannels, enabledEffects })
+  playbackStateRef.current = { clips, steps, notes, master, channelLevels, mutedChannels, enabledEffects }
   type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number}[]; master:number; channelLevels:number[] }
   const undoStack = useRef<Snapshot[]>([])
   const redoStack = useRef<Snapshot[]>([])
@@ -111,12 +112,38 @@ export default function App() {
     setClips(old => [...old, ...old.filter(c => c.lane !== 2).map(c => ({ ...c, id: Date.now() + c.id, name: c.name + ' copy', startBar: Math.min(7, (c.startBar ?? 0) + 1) }))])
     notify('Pattern clips duplicated.')
   }
+  const connectProcessedOutput = (ctx: AudioContext, input: AudioNode) => {
+    const effects = playbackStateRef.current.enabledEffects
+    let output: AudioNode = input
+    if (effects[0]) {
+      const highpass = ctx.createBiquadFilter()
+      highpass.type = 'highpass'; highpass.frequency.value = 28; highpass.Q.value = 0.7
+      output.connect(highpass); output = highpass
+    }
+    if (effects[1]) {
+      const compressor = ctx.createDynamicsCompressor()
+      compressor.threshold.value = -18; compressor.knee.value = 18; compressor.ratio.value = 3
+      compressor.attack.value = 0.008; compressor.release.value = 0.18
+      output.connect(compressor); output = compressor
+    }
+    output.connect(ctx.destination)
+    if (effects[2]) {
+      const delay = ctx.createDelay(0.2), feedback = ctx.createGain(), wet = ctx.createGain()
+      delay.delayTime.value = 0.045; feedback.gain.value = 0.22; wet.gain.value = 0.18
+      output.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
+    }
+    if (effects[3]) {
+      const delay = ctx.createDelay(1), feedback = ctx.createGain(), wet = ctx.createGain()
+      delay.delayTime.value = 60 / bpm / 2; feedback.gain.value = 0.28; wet.gain.value = 0.22
+      output.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
+    }
+  }
   const triggerDrum = (ctx: AudioContext, row: number) => {
     const { master, channelLevels, mutedChannels } = playbackStateRef.current
     const now = ctx.currentTime, out = ctx.createGain()
     const mixerIndex = row === 0 ? 1 : 2
     const channelLevel = channelLevels[row === 0 ? 0 : 1] ?? 100
-    out.gain.value = mutedChannels[0] || mutedChannels[mixerIndex] ? 0 : Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevel / 100)) * 0.8; out.connect(ctx.destination)
+    out.gain.value = mutedChannels[0] || mutedChannels[mixerIndex] ? 0 : Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevel / 100)) * 0.8; connectProcessedOutput(ctx, out)
     if (row === 0 || row === 3) {
       const osc = ctx.createOscillator(), env = ctx.createGain()
       osc.type = row === 0 ? 'sine' : 'triangle'
@@ -143,7 +170,7 @@ export default function App() {
     const mixerIndex = channelIndex === 2 ? 3 : 4
     const muted = mutedChannels[0] || mutedChannels[mixerIndex]
     env.gain.setValueAtTime(0.0001, now); env.gain.exponentialRampToValueAtTime((muted ? 0 : 0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)) * level), now + 0.025); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.22)
-    osc.connect(filter).connect(env).connect(ctx.destination); osc.start(now); osc.stop(now + 0.23)
+    osc.connect(filter).connect(env); connectProcessedOutput(ctx, env); osc.start(now); osc.stop(now + 0.23)
   }
   const clipActiveAt = (lane: number, bar: number) => playbackStateRef.current.clips.some(c => c.lane === lane && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
   useEffect(() => {
@@ -319,7 +346,7 @@ export default function App() {
         {view==='Mixer'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Mixer</h2><p>Channel levels · preview controls</p></div></div><button className="secondary-button compact" onClick={()=>{setMaster(78);setChannelLevels([78,66,72,55,60]);setMutedChannels([false,false,false,false,false,false])}}>Reset levels</button></div><div className="mixer-channels">{['Master','Kick','Percussion','Bass','Atmosphere','Reference'].map((name,i)=><div className="mixer-channel" key={name}><span className="mixer-number">0{i+1}</span><strong>{name}</strong><div className="meter"><i style={{height:[74,62,48,68,37,53][i]+'%'}}/><i style={{height:[63,53,41,57,29,44][i]+'%'}}/></div><input aria-label={name+' volume'} type="range" min="0" max="100" value={i===0?master:channelLevels[i-1]} onChange={e=>{const value=Number(e.target.value);if(i===0)setMaster(value);else setChannelLevels(old=>old.map((v,j)=>j===i-1?value:v))}}/><span className="db-value">{(20*Math.log10(Math.max(0.001,(i===0?master:channelLevels[i-1])/100))).toFixed(1)} dB</span><button onClick={()=>setMutedChannels(old=>old.map((muted,j)=>j===i?!muted:muted))} className={mutedChannels[i]?'mute-button muted':'mute-button'} aria-pressed={mutedChannels[i]} title={mutedChannels[i]?'Unmute '+name:'Mute '+name}>M</button></div>)}</div><p className="mixer-note"><Volume2 size={14}/> Full channel routing and effects need the dedicated audio engine.</p></section>}
         {view==='Reference Track'&&<section className="panel reference-panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><WandSparkles size={16}/></div><div><h2>AI Reference Track</h2><p>Use musical characteristics as inspiration for something original</p></div></div><b className="beta-tag large">EARLY ACCESS</b></div><div className="reference-drop" onClick={()=>fileInput.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();e.stopPropagation();importFile(e.dataTransfer.files?.[0])}}><div className="upload-orb"><FileAudio size={25}/></div><h3>{referenceName||'Drop a reference track here'}</h3><p>{referenceName?'Reference loaded. You can replace it with another audio file.':'Drag and drop an audio file, or browse your computer'}</p><span className="file-types">WAV · MP3 · FLAC · M4A</span><button className="secondary-button" onClick={e=>{e.stopPropagation();fileInput.current?.click()}}><Upload size={15}/> Choose audio file</button></div>{analysis.length>0&&<div className="analysis-results"><h3><FileAudio size={16}/> Import status</h3>{analysis.map(item=><div key={item}><Check size={14}/>{item}</div>)}</div>}<div className="reference-options"><div className="section-subhead"><div><h3>Shape the direction</h3><p>Choose what matters in your new track</p></div><span className="local-tag"><i className="status-dot green"/> LOCAL-FIRST DESIGN</span></div><label className="prompt-label" htmlFor="ref-prompt">Describe the sound you're aiming for</label><textarea id="ref-prompt" value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3}/><div className="reference-controls">{[['Groove',80],['Style',55],['Originality',85]].map(([name,val])=><label className="range-control" key={String(name)}><span>{name}<strong>{val}%</strong></span><input aria-label={String(name)} type="range" defaultValue={Number(val)} min="0" max="100"/></label>)}</div><div className="create-options"><span>GENERATE ELEMENTS</span>{['Drums','Bass','Melody','Chords','Atmosphere'].map((item,i)=><button key={item} className={'element-chip '+(generationElements.includes(item)?'chip-active':'')} aria-pressed={generationElements.includes(item)} onClick={()=>setGenerationElements(old=>old.includes(item)?old.filter(v=>v!==item):[...old,item])}><span>{['◉','≋','♫','◇','☼'][i]}</span>{item}</button>)}</div><button className="primary-button generate-button" onClick={generateAfroHouseIdea}><Sparkles size={16}/> Generate starting idea locally <span>→</span></button><p className="disclaimer">This creates editable drum steps and MIDI-style notes locally—no paid API. It is a procedural starting point, not AI audio generation or stem separation. Reference audio remains a separate track.</p></div></section>}
         {view==='Instruments'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Disc3 size={16}/></div><div><h2>Instruments</h2><p>Starter sound previews and future plugin slots</p></div></div><button className="secondary-button compact" onClick={()=>notify('VST3 hosting is planned for a later audio-engine milestone.')}><Plus size={14}/> Add plugin</button></div><div className="instrument-grid">{[{name:'Deep Kick',kind:'DRUM SYNTH',Icon:Drum,color:'lime',hz:65},{name:'Warm Bass',kind:'SYNTH',Icon:Waves,color:'purple',hz:110},{name:'Soft Keys',kind:'KEYS',Icon:Music2,color:'cyan',hz:440},{name:'Air Texture',kind:'ATMOSPHERE',Icon:Waves,color:'orange',hz:660}].map(item=><button className="instrument-card" key={item.name} onClick={()=>void preview(item.hz)}><div className={'instrument-art '+item.color}><item.Icon size={25}/><span className="art-wave">∿ ∿ ∿</span></div><div className="instrument-meta"><span>{item.kind}</span><strong>{item.name}</strong><small>Preview tone · v0.1</small></div><Play size={16}/></button>)}</div><p className="mixer-note">Preview tones only; full samplers, synths and VST3 hosting are planned.</p></section>}
-        {view==='Effects'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Effects</h2><p>Planned processing chain</p></div></div></div>{['Parametric EQ','Warm Compressor','Plate Reverb','Tempo Delay'].map((name,i)=><div className="effect-row" key={name}><div className="effect-icon"><SlidersHorizontal size={18}/></div><div className="effect-info"><strong>{name}</strong><span>{['Shape low end and clean up the mix','Glue drums and bass together','Add depth to percussion and keys','Create rhythmic echoes in time'][i]}</span></div><span className="effect-tag">{['EQ','DYNAMICS','SPACE','TIME'][i]}</span><button className="secondary-button compact" onClick={()=>notify(name+' is not connected to audio processing yet.')}>Open</button></div>)}</section>}
+        {view==='Effects'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Effects</h2><p>Planned processing chain</p></div></div></div>{['Low-cut EQ','Warm Compressor','Short Reverb','Tempo Delay'].map((name,i)=><div className="effect-row" key={name}><div className="effect-icon"><SlidersHorizontal size={18}/></div><div className="effect-info"><strong>{name}</strong><span>{['Remove subsonic rumble from the signal','Control peaks and add gentle glue','Add a short, subtle room-like echo','Create rhythmic echoes synced to BPM'][i]}</span></div><span className="effect-tag">{['EQ','DYNAMICS','SPACE','TIME'][i]}</span><button className={enabledEffects[i]?'primary-button compact':'secondary-button compact'} aria-pressed={enabledEffects[i]} onClick={()=>{setEnabledEffects(old=>old.map((v,j)=>i===j?!v:v));notify(name+(enabledEffects[i]?' disabled.':' enabled.'))}}>{enabledEffects[i]?'On':'Off'}</button></div>)}</section>}
         <div className="bottom-hint"><div className="hint-icon"><Sparkles size={15}/></div><div><strong>A little idea goes a long way.</strong><span>Start with a groove. Let the feeling lead.</span></div><button onClick={()=>setView('Reference Track')}>Try AI Reference Track <span>→</span></button></div>
       </main>
     </div>
