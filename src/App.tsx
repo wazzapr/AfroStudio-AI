@@ -77,7 +77,6 @@ export default function App() {
     undoStack.current.push(projectRef.current); applySnapshot(next); notify('Redo')
   }
   const generateAfroHouseIdea = () => {
-    if (!referenceName) { notify('Add a reference track first so you can keep it in the project while creating an original idea.'); return }
     const selected = new Set(generationElements)
     if (selected.size === 0) { notify('Select at least one element to generate.'); return }
     if (selected.has('Drums')) setSteps([
@@ -86,9 +85,16 @@ export default function App() {
       Array.from({length:16},(_,i)=>i%2===0 || i===11 || i===15),
       Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>0.22),
     ])
-    if (selected.has('Melody') || selected.has('Chords')) {
+    if (selected.has('Melody') || selected.has('Chords') || selected.has('Atmosphere')) {
       const scale = [0,2,3,5,7,8,10]
-      const generated = Array.from({length:selected.has('Chords')?8:6},(_,i)=>({id:Date.now()+i,step:[0,2,5,7,9,12,14,15][i],pitch:scale[Math.floor(Math.random()*scale.length)]}))
+      const positions = selected.has('Atmosphere') ? [0,4,8,12] : [0,2,5,7,9,12,14,15]
+      const generated: {id:number;step:number;pitch:number}[] = []
+      positions.forEach((step,i) => {
+        const root = scale[Math.floor(Math.random()*scale.length)]
+        if (selected.has('Chords')) [root,(root+3)%12,(root+7)%12].forEach((pitch,j)=>generated.push({id:Date.now()+i*10+j,step,pitch}))
+        else if (selected.has('Atmosphere')) [root,Math.min(11,root+4)].forEach((pitch,j)=>generated.push({id:Date.now()+i*10+j,step,pitch}))
+        else generated.push({id:Date.now()+i,step,pitch:root})
+      })
       setNotes(generated)
     }
     if (selected.has('Bass')) setClips(old=>old.some(c=>c.lane===1)?old: [...old,{id:Date.now()+20,name:'Generated bass groove',duration:8,color:colors[1],lane:1,startBar:0}])
