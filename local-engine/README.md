@@ -1,36 +1,42 @@
 # AfroStudio AI local engine
 
-This optional Python service connects AfroStudio AI to a separately running local ACE-Step API. It listens only on `127.0.0.1:7860` and does not expose the service to your network.
+This optional Python service connects AfroStudio AI to a separately running local ACE-Step API. It listens only on \`127.0.0.1:7860\` and does not expose the service to your network.
 
-## What it does
+## Windows setup helper
 
-- `GET /health`: confirms that the bridge is running.
-- `GET /status`: checks whether an ACE-Step API is reachable.
-- `POST /generate`: submits a prompt, BPM, duration, and optionally a reference audio upload (multipart form data) to ACE-Step.
-- `GET /tasks/{task_id}`: checks generation progress.
-- `GET /audio/{task_id}`: serves the generated audio when ready.
+From the downloaded project folder, open PowerShell in \`local-engine\` and run:
 
-The bridge does **not** download model weights. By default it expects ACE-Step's API at `http://127.0.0.1:8001`. Set `ACESTEP_API_URL` if you use another local address, for example in PowerShell:
+\`\`\`powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup-windows.ps1
+\`\`\`
 
-```powershell
-$env:ACESTEP_API_URL = "http://127.0.0.1:8001"
-py server.py
-```
+The helper checks for Python 3.10–3.13, checks available disk space, reports NVIDIA GPU memory when \`nvidia-smi\` is available, creates a private Python virtual environment for the bridge, and can start the bridge. The bridge has no third-party Python package dependencies.
 
-Start the bridge from this folder with `py server.py`. Keep the console open. The web app can connect to `http://127.0.0.1:7860`.
+**Important:** this is setup groundwork, not the final one-click AfroStudio installer. It does not install ACE-Step or download model weights. The model installation must wait until a compatible backend and safe hardware-specific install path are verified. In particular, a GTX 750 Ti with 2 GB VRAM is below the currently documented 4 GB recommendation for ACE-Step 1.5's low-memory mode; CPU generation may be extremely slow or fail.
 
-## Hardware and model limits
+## What the bridge does
 
-ACE-Step 1.5 is the first model adapter being tested because it supports full-song generation and reference-audio workflows. Its own install guide recommends at least 4 GB VRAM for its low-memory DiT-only mode. A GTX 750 Ti with 2 GB VRAM is below that recommendation; CPU-only operation may be very slow or fail. Do not assume this PC can run it successfully, and do not download several gigabytes of model files without checking available disk space first.
+- \`GET /health\`: confirms that the bridge is running.
+- \`GET /status\`: checks whether an ACE-Step API is reachable.
+- \`POST /generate\`: submits a prompt, BPM, duration, and optionally a reference audio upload (multipart form data) to ACE-Step.
+- \`GET /tasks/{task_id}\`: checks generation progress.
+- \`GET /audio/{task_id}\`: serves generated audio when ready.
 
-The bridge accepts a reference audio file up to 25 MB and submits it to ACE-Step as a `src_audio` cover task, with an instruction to create an original track inspired by broad production style rather than copy melody or lyrics. The app sends the selected reference file and style-influence slider value. ACE-Step may still fail depending on its installed version, model setup, and hardware. The generated audio is returned to the app through a local task/audio endpoint; it does not use a paid API. Keep reference prompts broad and original rather than requesting a copy of a particular copyrighted song.
+By default, it expects ACE-Step's API at \`http://127.0.0.1:8001\`. Set \`ACESTEP_API_URL\` if you use another local address. To start the bridge manually after setup:
+
+\`\`\`powershell
+.\.venv\Scripts\python.exe server.py
+\`\`\`
+
+Keep the console open. The web app can connect to \`http://127.0.0.1:7860\`.
 
 ## Test the bridge
 
 From this folder:
 
-```powershell
-py -m unittest -v
-```
+\`\`\`powershell
+.\.venv\Scripts\python.exe -m unittest -v
+\`\`\`
 
-Tests exercise the local HTTP endpoints without requiring ACE-Step or downloading a model.
+Tests do not require ACE-Step or download a model.
