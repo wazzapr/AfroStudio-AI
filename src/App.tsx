@@ -131,11 +131,13 @@ export default function App() {
       const delay = ctx.createDelay(0.2), feedback = ctx.createGain(), wet = ctx.createGain()
       delay.delayTime.value = 0.045; feedback.gain.value = 0.22; wet.gain.value = 0.18
       output.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
+      window.setTimeout(() => { delay.disconnect(); feedback.disconnect(); wet.disconnect() }, 2500)
     }
     if (effects[3]) {
       const delay = ctx.createDelay(1), feedback = ctx.createGain(), wet = ctx.createGain()
       delay.delayTime.value = 60 / bpm / 2; feedback.gain.value = 0.28; wet.gain.value = 0.22
       output.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
+      window.setTimeout(() => { delay.disconnect(); feedback.disconnect(); wet.disconnect() }, 2500)
     }
   }
   const triggerDrum = (ctx: AudioContext, row: number) => {
