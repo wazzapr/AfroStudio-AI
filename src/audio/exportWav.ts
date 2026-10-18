@@ -124,7 +124,8 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
-  const duration = safeBars * 4 * 60 / safeBpm + 0.4
+  const noteTail = Math.max(0.4, ...notes.map(note => (note.duration ?? 2) * secondsPerStep))
+  const duration = safeBars * 4 * 60 / safeBpm + noteTail
   const sampleRate = 44100
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate)
   const totalSteps = safeBars * 16
