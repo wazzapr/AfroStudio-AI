@@ -125,7 +125,7 @@ export default function App() {
       try {
         setAutosaveStatus('saving')
         const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
         window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
         setAutosaveStatus('saved')
       } catch {
@@ -134,7 +134,7 @@ export default function App() {
       }
     }, 700)
     return () => window.clearTimeout(timeout)
-  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
   // Flush the newest project state immediately when the tab is closed or navigated away.
   // The debounced autosave is still used during editing, but a quick close should not lose
   // edits made during its 700 ms delay.
@@ -143,7 +143,7 @@ export default function App() {
     const saveOnPageHide = () => {
       try {
         const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
         window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
       } catch {
         // Closing the tab must never be blocked by storage failures.
@@ -151,7 +151,7 @@ export default function App() {
     }
     window.addEventListener('pagehide', saveOnPageHide)
     return () => window.removeEventListener('pagehide', saveOnPageHide)
-  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
   useEffect(() => {
     let cancelled = false
     const restoreSamples = async () => {
@@ -689,7 +689,7 @@ export default function App() {
   }
   const saveProject = () => {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -741,6 +741,9 @@ export default function App() {
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
+      if (typeof data.grooveAmount === 'number' && Number.isFinite(data.grooveAmount)) setGrooveAmount(Math.max(0, Math.min(100, data.grooveAmount)))
+      if (typeof data.styleInfluence === 'number' && Number.isFinite(data.styleInfluence)) setStyleInfluence(Math.max(0, Math.min(100, data.styleInfluence)))
+      if (typeof data.originalityAmount === 'number' && Number.isFinite(data.originalityAmount)) setOriginalityAmount(Math.max(0, Math.min(100, data.originalityAmount)))
       if (Array.isArray(data.generationElements) && data.generationElements.every(value => ['Drums','Bass','Melody','Chords','Atmosphere'].includes(String(value)))) setGenerationElements(data.generationElements as string[])
       if (Array.isArray(data.rowSampleNames) && data.rowSampleNames.length === 4 && data.rowSampleNames.every(name => typeof name === 'string')) {
         const names = data.rowSampleNames as string[]
