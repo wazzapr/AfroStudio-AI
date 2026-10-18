@@ -131,6 +131,23 @@ export default function App() {
     }, 700)
     return () => window.clearTimeout(timeout)
   }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
+  // Flush the newest project state immediately when the tab is closed or navigated away.
+  // The debounced autosave is still used during editing, but a quick close should not lose
+  // edits made during its 700 ms delay.
+  useEffect(() => {
+    if (!autosaveReady.current || !sampleStorageReady) return
+    const saveOnPageHide = () => {
+      try {
+        const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
+      } catch {
+        // Closing the tab must never be blocked by storage failures.
+      }
+    }
+    window.addEventListener('pagehide', saveOnPageHide)
+    return () => window.removeEventListener('pagehide', saveOnPageHide)
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
   useEffect(() => {
     let cancelled = false
     const restoreSamples = async () => {
