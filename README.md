@@ -9,9 +9,10 @@ The project is an early, actively developed browser-based studio foundation. The
 - Playlist with draggable pattern/audio clips, an arrangement playhead, tempo control, and transport.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
 - 16-step Channel Rack and Piano Roll with selectable notes, drag-to-move pitch/time editing on a 1-step grid, right-edge note resizing, adjustable step-length and velocity, and note deletion.
-- Mixer level controls and working mute toggles for the available preview channels.
+- Mixer level controls and mute toggles for the available preview channels; WAV export honors channel mute states.
+- Four lightweight selectable synth presets (Deep Kick, Warm Bass, Soft Keys, Air Texture) change Piano Roll playback and are included in WAV export and project save/load.
 - Starter playback effects that can be toggled on/off: low-cut filter, dynamics compressor, short echo, and tempo-synced delay.
-- JSON project export/import and WAV arrangement export.
+- JSON project export/import and WAV arrangement export that automatically extends up to 16 bars to cover the current clip arrangement.
 - Local procedural Afro House idea generation (patterns and notes); this is not a trained AI music-generation model.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, and save.
 
