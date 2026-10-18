@@ -598,7 +598,7 @@ export default function App() {
   }
   const saveProject = () => {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationElements, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
     notify('Project data exported.')
@@ -645,6 +645,7 @@ export default function App() {
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
+      if (Array.isArray(data.generationElements) && data.generationElements.every(value => ['Drums','Bass','Melody','Chords','Atmosphere'].includes(String(value)))) setGenerationElements(data.generationElements as string[])
       if (Array.isArray(data.rowSampleNames) && data.rowSampleNames.length === 4 && data.rowSampleNames.every(name => typeof name === 'string')) {
         const names = data.rowSampleNames as string[]
         const savedIds = Array.isArray(data.rowSampleIds) && data.rowSampleIds.length === 4 && data.rowSampleIds.every(id => typeof id === 'string') ? data.rowSampleIds as string[] : []
