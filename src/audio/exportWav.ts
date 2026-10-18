@@ -9,6 +9,7 @@ type ExportOptions = {
   notes: ExportNote[]
   clips: ExportClip[]
   channelLevels?: number[]
+  referenceAudio?: AudioBuffer
   bars?: number
 }
 
@@ -118,7 +119,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([output], { type: 'audio/wav' })
 }
 
-export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], bars = 8 }: ExportOptions): Promise<void> {
+export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8 }: ExportOptions): Promise<void> {
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
@@ -126,6 +127,17 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
   const sampleRate = 44100
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate)
   const totalSteps = safeBars * 16
+  if (referenceAudio) {
+    const referenceClip = clips.find(clip => clip.lane === 2)
+    if (referenceClip) {
+      const source = ctx.createBufferSource()
+      const gain = ctx.createGain()
+      source.buffer = referenceAudio
+      gain.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevels[4] ?? 100) / 100)
+      source.connect(gain).connect(ctx.destination)
+      source.start(Math.max(0, (referenceClip.startBar ?? 0) * 4 * 60 / safeBpm))
+    }
+  }
   const activeAt = (lane: number, bar: number) => clips.some(clip => {
     const start = clip.startBar ?? 0
     return clip.lane === lane && bar >= start && bar < start + Math.max(1, Math.ceil(clip.duration))
