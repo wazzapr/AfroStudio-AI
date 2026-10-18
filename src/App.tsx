@@ -267,6 +267,7 @@ export default function App() {
       setLocalAiMessage('Enter a local engine URL beginning with http:// or https://.')
       return
     }
+    setAceStepAvailable(false)
     setLocalAiStatus('checking')
     setLocalAiMessage('Checking the local engine health endpoint…')
     const controller = new AbortController()
