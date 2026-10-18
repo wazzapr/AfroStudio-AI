@@ -689,21 +689,25 @@ export default function App() {
       const parsed: unknown = JSON.parse(await file.text())
       if (!parsed || typeof parsed !== 'object') throw new Error('Invalid project')
       const data = parsed as Record<string, unknown>
-      if (data.app !== 'AfroStudio AI' || typeof data.bpm !== 'number' || !Array.isArray(data.clips) || !Array.isArray(data.steps) || !Array.isArray(data.notes)) {
+      if (data.app !== 'AfroStudio AI' || typeof data.bpm !== 'number' || !Number.isFinite(data.bpm) || !Array.isArray(data.clips) || !Array.isArray(data.steps) || !Array.isArray(data.notes)) {
         throw new Error('This is not a supported AfroStudio project file.')
+      }
+      if (!sampleStorageReady) {
+        notify('Please wait for the local sample library to finish loading, then open the project again.')
+        return
       }
       const validSteps = data.steps.length === 4 && data.steps.every(row => Array.isArray(row) && row.length === 16 && row.every(value => typeof value === 'boolean'))
       const validClips = data.clips.every((clip: unknown) => {
         if (!clip || typeof clip !== 'object') return false
         const item = clip as Record<string, unknown>
-        return typeof item.id === 'number' && typeof item.name === 'string' && typeof item.duration === 'number' &&
-          typeof item.color === 'string' && typeof item.lane === 'number' && Number.isInteger(item.lane) && item.lane >= 0 && item.lane <= 3 && typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 1 && item.duration <= 64 && (item.startBar === undefined || (typeof item.startBar === 'number' && Number.isInteger(item.startBar) && item.startBar >= 0 && item.startBar <= 15))
+        return typeof item.id === 'number' && Number.isFinite(item.id) && typeof item.name === 'string' && typeof item.duration === 'number' &&
+          typeof item.color === 'string' && typeof item.lane === 'number' && Number.isInteger(item.lane) && item.lane >= 0 && item.lane <= 3 && Number.isFinite(item.duration) && item.duration >= 1 && item.duration <= 64 && (item.startBar === undefined || (typeof item.startBar === 'number' && Number.isInteger(item.startBar) && item.startBar >= 0 && item.startBar <= 15))
       })
       const validNotes = data.notes.every((note: unknown) => {
         if (!note || typeof note !== 'object') return false
         const item = note as Record<string, unknown>
-        return typeof item.id === 'number' && typeof item.step === 'number' && item.step >= 0 && item.step < 16 &&
-          typeof item.pitch === 'number' && item.pitch >= 0 && item.pitch < 12 && (item.duration === undefined || (typeof item.duration === 'number' && item.duration >= 1 && item.duration <= 16)) && (item.velocity === undefined || (typeof item.velocity === 'number' && item.velocity >= 1 && item.velocity <= 127))
+        return typeof item.id === 'number' && Number.isFinite(item.id) && typeof item.step === 'number' && Number.isInteger(item.step) && item.step >= 0 && item.step < 16 &&
+          typeof item.pitch === 'number' && Number.isInteger(item.pitch) && item.pitch >= 0 && item.pitch < 12 && (item.duration === undefined || (typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 1 && item.duration <= 16)) && (item.velocity === undefined || (typeof item.velocity === 'number' && Number.isFinite(item.velocity) && item.velocity >= 1 && item.velocity <= 127))
       })
       if (!validSteps || !validClips || !validNotes) throw new Error('Project data is incomplete or damaged.')
       setPlaying(false)
