@@ -131,6 +131,8 @@ export default function App() {
   }
   const generateAfroHouseIdea = () => {
     const selected = new Set(generationElements)
+    const referenceTempo = audioUrl && detectedBpm ? detectedBpm : null
+    if (referenceTempo) setBpm(referenceTempo)
     if (selected.size === 0) { notify('Select at least one element to generate.'); return }
     if (selected.has('Drums')) setSteps([
       Array.from({length:16},(_,i)=>i%4===0),
@@ -154,7 +156,7 @@ export default function App() {
     if (selected.has('Drums')) setClips(old=>old.some(c=>c.lane===0)?old:[...old,{id:Date.now()+21,name:'Generated Afro groove',duration:8,color:colors[0],lane:0,startBar:0}])
     if (selected.has('Melody') || selected.has('Chords')) setClips(old=>old.some(c=>c.lane===3)?old:[...old,{id:Date.now()+22,name:'Generated melody',duration:8,color:colors[3],lane:3,startBar:0}])
     setView('Playlist')
-    notify('Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.')
+    notify(referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM). Audio remixing and stem separation are not implemented yet.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.')
   }
   const duplicatePattern = () => {
     const selected = clips.find(clip => clip.id === selectedClipId)
