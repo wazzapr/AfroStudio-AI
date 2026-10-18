@@ -63,15 +63,19 @@ def multipart_request(url, fields, file_field, file_name, file_bytes, file_type)
 
 def generation_worker(task_id, prompt, bpm, duration, reference_bytes=None, reference_name='reference.wav', reference_type='audio/wav', style_influence=0.55):
     try:
-        submitted = json_request(ACESTEP_API_URL + "/release_task", {
-            "prompt": prompt,
-            "bpm": bpm,
-            "audio_duration": duration,
-            "audio_format": "wav",
-            "model": "acestep-v15-turbo",
-            "thinking": False,
-            "batch_size": 1,
-        }, timeout=20)
+        fields = {
+            "prompt": prompt, "bpm": bpm, "audio_duration": duration, "audio_format": "wav",
+            "model": "acestep-v15-turbo", "thinking": False, "batch_size": 1, "inference_steps": 8,
+        }
+        if reference_bytes:
+            fields.update({
+                "task_type": "cover",
+                "instruction": "Create a new, original Afro House track inspired by the broad production style, energy, percussion feel and mood of the uploaded reference. Do not reproduce the original melody or lyrics.",
+                "audio_cover_strength": max(0.2, min(0.8, 1.0 - style_influence)),
+            })
+            submitted = multipart_request(ACESTEP_API_URL + "/release_task", fields, "src_audio", reference_name, reference_bytes, reference_type)
+        else:
+            submitted = json_request(ACESTEP_API_URL + "/release_task", fields, timeout=20)
         provider_task_id = submitted.get("task_id") if isinstance(submitted, dict) else None
         if not provider_task_id:
             raise RuntimeError("ACE-Step did not return a task ID.")
