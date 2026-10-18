@@ -341,7 +341,8 @@ export default function App() {
       if (!result || typeof result !== 'object' || !('task_id' in result)) throw new Error('The local engine returned an invalid generation task.')
       const taskId = String((result as {task_id: unknown}).task_id)
       notify('AI generation started. This may take a while on a low-end PC.')
-      for (let attempt = 0; attempt < 240; attempt += 1) {
+      const maxAttempts = Math.ceil(Math.max(1200, generationDuration * 20) / 3)
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         await new Promise<void>(resolve => window.setTimeout(resolve, 3000))
         const taskResponse = await fetch(baseUrl + '/tasks/' + encodeURIComponent(taskId))
         const task: unknown = await taskResponse.json()
@@ -360,7 +361,7 @@ export default function App() {
           return
         }
       }
-      throw new Error('Generation is still running after 12 minutes. Check the local engine console before trying again.')
+      throw new Error('Generation is still running after the allowed wait for this audio length. Check the local engine console before trying again.')
     } catch (error) {
       notify(error instanceof Error ? error.message : 'AI audio generation failed.')
     } finally {
