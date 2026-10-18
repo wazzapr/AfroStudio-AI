@@ -597,7 +597,7 @@ export default function App() {
   }
   const saveProject = () => {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, prompt, enabledEffects, selectedInstrument, rowSampleNames }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, prompt, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
     notify('Project data exported.')
@@ -646,8 +646,14 @@ export default function App() {
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
       if (Array.isArray(data.rowSampleNames) && data.rowSampleNames.length === 4 && data.rowSampleNames.every(name => typeof name === 'string')) {
         const names = data.rowSampleNames as string[]
-        setRowSampleIds(names.map(name => name ? drumSamples.find(sample => sample.name === name)?.id ?? '' : ''))
-        if (names.some(name => name) && names.some(name => !drumSamples.some(sample => sample.name === name))) notify('Project loaded. Import missing drum samples to restore all assigned sounds.')
+        const savedIds = Array.isArray(data.rowSampleIds) && data.rowSampleIds.length === 4 && data.rowSampleIds.every(id => typeof id === 'string') ? data.rowSampleIds as string[] : []
+        const restoredIds = names.map((name, row) => {
+          const savedId = savedIds[row]
+          if (savedId && drumSamples.some(sample => sample.id === savedId)) return savedId
+          return name ? drumSamples.find(sample => sample.name === name)?.id ?? '' : ''
+        })
+        setRowSampleIds(restoredIds)
+        if (names.some((name, row) => name && !restoredIds[row])) notify('Project loaded. Import missing drum samples to restore all assigned sounds.')
       } else setRowSampleIds(['', '', '', ''])
       stepRef.current = 0
       setPlayheadStep(0)
