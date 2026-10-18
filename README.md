@@ -6,7 +6,7 @@ A free-first, Windows-focused music production studio inspired by familiar DAW w
 
 The project is an early, actively developed browser-based studio foundation. The current branch includes:
 
-- Playlist with draggable pattern/audio clips, whole-bar clip resizing from the right edge, a horizontally scrollable 16-bar timeline, an arrangement-length-aware playhead, tempo control, and transport.
+- Playlist with draggable pattern/audio clips, whole-bar clip resizing from the right edge, a horizontally scrollable 16-bar timeline, click-to-seek playhead, arrangement-length-aware playback, tempo control, and transport.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
 - 16-step Channel Rack and Piano Roll with selectable notes, drag-to-move pitch/time editing on a 1-step grid, right-edge note resizing, adjustable step-length and velocity, and note deletion.
 - Mixer level controls and mute toggles for the available preview channels; WAV export honors channel mute states.
