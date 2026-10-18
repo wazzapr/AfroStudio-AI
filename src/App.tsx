@@ -85,7 +85,7 @@ export default function App() {
             restored.push({ id: item.id, name: item.name, buffer, url: URL.createObjectURL(item.blob), duration: buffer.duration })
           } catch { /* Keep other valid samples if one file is no longer decodable. */ }
         }
-        if (!cancelled && restored.length) setDrumSamples(restored)
+        if (!cancelled && restored.length) setDrumSamples(old => [...restored, ...old.filter(sample => !restored.some(item => item.id === sample.id))])
         sampleLibraryLoaded.current = true
       } catch { sampleLibraryLoaded.current = true; if (!cancelled) notify('Local sample storage is unavailable in this browser. You can still import samples for this session.') }
     }
