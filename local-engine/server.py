@@ -5,7 +5,9 @@ support it, then point ACESTEP_API_URL at its local API (default port 8001).
 """
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, quote, urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
+from email.parser import BytesParser
+from email.policy import default
 from urllib.request import Request, urlopen
 import json
 import os
@@ -20,6 +22,7 @@ ACESTEP_API_URL = os.environ.get("ACESTEP_API_URL", "http://127.0.0.1:8001").rst
 TASKS = {}
 TASKS_LOCK = threading.Lock()
 MAX_PROMPT_LENGTH = 2000
+MAX_REFERENCE_BYTES = 25 * 1024 * 1024
 
 
 def json_request(url, payload=None, timeout=5):
@@ -43,7 +46,22 @@ def probe_ace_step():
         return {"available": False, "url": ACESTEP_API_URL, "message": "ACE-Step API not detected on the configured local address."}
 
 
-def generation_worker(task_id, prompt, bpm, duration):
+
+def multipart_request(url, fields, file_field, file_name, file_bytes, file_type):
+    boundary = '----AfroStudioBoundary' + uuid.uuid4().hex
+    chunks = []
+    for key, value in fields.items():
+        chunks.extend([('--' + boundary + '\r\n').encode(), ('Content-Disposition: form-data; name="' + key + '"\r\n\r\n').encode(), str(value).encode('utf-8'), b'\r\n'])
+    safe_name = os.path.basename(file_name).replace('"', '')
+    chunks.extend([('--' + boundary + '\r\n').encode(), ('Content-Disposition: form-data; name="' + file_field + '"; filename="' + safe_name + '"\r\n').encode(), ('Content-Type: ' + file_type + '\r\n\r\n').encode(), file_bytes, b'\r\n', ('--' + boundary + '--\r\n').encode()])
+    request = Request(url, data=b''.join(chunks), headers={'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Accept': 'application/json'}, method='POST')
+    with urlopen(request, timeout=60) as response:
+        result = json.loads(response.read().decode('utf-8'))
+    if not isinstance(result, dict) or result.get('code', 200) not in (200, None):
+        raise RuntimeError(str(result.get('error', 'ACE-Step returned an unexpected response.')) if isinstance(result, dict) else 'Invalid ACE-Step response.')
+    return result.get('data', result)
+
+def generation_worker(task_id, prompt, bpm, duration, reference_bytes=None, reference_name='reference.wav', reference_type='audio/wav', style_influence=0.55):
     try:
         submitted = json_request(ACESTEP_API_URL + "/release_task", {
             "prompt": prompt,
