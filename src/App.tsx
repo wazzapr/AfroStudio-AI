@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import { AudioWaveform, Bot, Check, ChevronDown, Copy, Disc3, Download, Drum, FileAudio, FolderOpen, Layers3, Music2, Pause, Play, Plus, Redo2, Save, Settings2, SlidersHorizontal, Sparkles, Square, Trash2, Undo2, Upload, Volume2, Waves, WandSparkles, X } from 'lucide-react'
 import { exportArrangementWav } from './audio/exportWav'
 
@@ -277,7 +278,7 @@ export default function App() {
     audio.load()
   }
   const pianoDrag = useRef<{id:number;pointerId:number;startX:number;startY:number;step:number;pitch:number;duration:number;resizing:boolean} | null>(null)
-  const handlePianoPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handlePianoPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
     const noteElement = target.closest<HTMLButtonElement>('.midi-note')
     if (!noteElement) return
@@ -290,7 +291,7 @@ export default function App() {
     pianoDrag.current = { id, pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, step:note.step, pitch:note.pitch, duration:note.duration, resizing:event.clientX >= rect.right - 9 }
     setSelectedNoteId(id)
   }
-  const handlePianoPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handlePianoPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = pianoDrag.current
     if (!drag || drag.pointerId !== event.pointerId) return
     const rect = event.currentTarget.getBoundingClientRect()
@@ -305,7 +306,7 @@ export default function App() {
     const pitch = Math.max(0, Math.min(11, drag.pitch - rowDelta))
     setNotes(old => old.map(note => note.id === drag.id ? {...note, step, pitch, duration:Math.min(note.duration,16-step)} : note))
   }
-  const handlePianoPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handlePianoPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (pianoDrag.current?.pointerId === event.pointerId) pianoDrag.current = null
   }
   const saveProject = () => {
