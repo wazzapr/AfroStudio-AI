@@ -41,7 +41,10 @@ export default function App() {
   const [audioUrl, setAudioUrl] = useState('')
   const [playheadStep, setPlayheadStep] = useState(0)
   const audioElement = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const stepRef = useRef(0)
+  const playbackStateRef = useRef({ clips, steps, notes, master, channelLevels })
+  playbackStateRef.current = { clips, steps, notes, master, channelLevels }
   type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number}[]; master:number; channelLevels:number[] }
   const undoStack = useRef<Snapshot[]>([])
   const redoStack = useRef<Snapshot[]>([])
@@ -108,6 +111,7 @@ export default function App() {
     notify('Pattern clips duplicated.')
   }
   const triggerDrum = (ctx: AudioContext, row: number) => {
+    const { master, channelLevels } = playbackStateRef.current
     const now = ctx.currentTime, out = ctx.createGain()
     const channelLevel = channelLevels[row === 0 ? 0 : 1] ?? 100
     out.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevel / 100)) * 0.8; out.connect(ctx.destination)
@@ -129,6 +133,7 @@ export default function App() {
     }
   }
   const triggerNote = (ctx: AudioContext, pitch: number, level = 1, channelIndex = 3) => {
+    const { master, channelLevels } = playbackStateRef.current
     const now = ctx.currentTime, osc = ctx.createOscillator(), env = ctx.createGain(), filter = ctx.createBiquadFilter()
     osc.type = 'triangle'; osc.frequency.value = 440 * Math.pow(2, ((60 + pitch) - 69) / 12)
     filter.type = 'lowpass'; filter.frequency.value = 2400
@@ -136,32 +141,48 @@ export default function App() {
     env.gain.setValueAtTime(0.0001, now); env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)) * level, now + 0.025); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.22)
     osc.connect(filter).connect(env).connect(ctx.destination); osc.start(now); osc.stop(now + 0.23)
   }
-  const clipActiveAt = (lane: number, bar: number) => clips.some(c => c.lane === lane && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
+  const clipActiveAt = (lane: number, bar: number) => playbackStateRef.current.clips.some(c => c.lane === lane && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
   useEffect(() => {
     if (!playing) return
-    const ctx = audioContext || new window.AudioContext()
-    if (!audioContext) setAudioContext(ctx)
+    const ctx = audioContextRef.current || new window.AudioContext()
+    if (!audioContextRef.current) {
+      audioContextRef.current = ctx
+      setAudioContext(ctx)
+    }
     void ctx.resume()
     const tick = () => {
       const position = stepRef.current
       const bar = Math.floor(position / 16)
       const step = position % 16
-      if (clipActiveAt(0, bar)) steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
+      const current = playbackStateRef.current
+      if (clipActiveAt(0, bar)) current.steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
       if (clipActiveAt(1, bar) && [0, 6, 8, 14].includes(step)) triggerNote(ctx, step % 8 === 0 ? 0 : 3, 0.72, 2)
-      if (clipActiveAt(3, bar)) notes.filter(note => note.step === step).forEach(note => triggerNote(ctx, note.pitch))
-      const reference = clips.find(c => c.lane === 2 && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
+      if (clipActiveAt(3, bar)) current.notes.filter(note => note.step === step).forEach(note => triggerNote(ctx, note.pitch))
+      const reference = current.clips.find(c => c.lane === 2 && bar >= (c.startBar ?? 0) && bar < (c.startBar ?? 0) + Math.max(1, Math.ceil(c.duration)))
       const audio = audioElement.current
       if (audio && reference) {
         const expectedTime = Math.max(0, (bar - (reference.startBar ?? 0)) * 4 * 60 / bpm + step * 60 / bpm / 4)
-        if (audio.paused) { audio.currentTime = expectedTime; void audio.play().catch(() => notify('Browser blocked reference playback. Press Play again to allow audio.')) }
-        else if (Math.abs(audio.currentTime - expectedTime) > 0.3) audio.currentTime = Math.min(expectedTime, Number.isFinite(audio.duration) ? audio.duration : expectedTime)
+        if (audio.paused) {
+          audio.currentTime = Math.min(expectedTime, Number.isFinite(audio.duration) ? audio.duration : expectedTime)
+          void audio.play().catch(() => notify('Browser blocked reference playback. Press Play again to allow audio.'))
+        } else if (Math.abs(audio.currentTime - expectedTime) > 0.3) {
+          audio.currentTime = Math.min(expectedTime, Number.isFinite(audio.duration) ? audio.duration : expectedTime)
+        }
       } else if (audio && !audio.paused) audio.pause()
-      setPlayheadStep(position); stepRef.current = (position + 1) % 128
+      setPlayheadStep(position)
+      if (position >= 127) {
+        stepRef.current = 0
+        setPlayheadStep(0)
+        setPlaying(false)
+        if (audio && !audio.paused) audio.pause()
+      } else {
+        stepRef.current = position + 1
+      }
     }
     tick()
     const timer = window.setInterval(tick, 60000 / bpm / 4)
     return () => window.clearInterval(timer)
-  }, [playing, bpm, steps, notes, clips, master, channelLevels, audioContext])
+  }, [playing, bpm])
   useEffect(() => {
     const audio = audioElement.current
     if (!audio) return
@@ -190,7 +211,8 @@ export default function App() {
   const preview = async (hz = 110) => {
     try {
       const Ctx = window.AudioContext
-      const ctx = audioContext || new Ctx()
+      const ctx = audioContextRef.current || audioContext || new Ctx()
+      if (!audioContextRef.current) audioContextRef.current = ctx
       if (!audioContext) setAudioContext(ctx)
       if (ctx.state === 'suspended') await ctx.resume()
       const osc = ctx.createOscillator()
@@ -211,7 +233,7 @@ export default function App() {
       const duration = Number.isFinite(audio.duration) ? audio.duration : 30
       setReferenceName(file.name)
       setAudioUrl(url); audioElement.current = audio
-      setClips(old => [...old.filter(c => !(c.lane === 2 && c.name === 'Reference · drop a song')), { id: Date.now(), name: file.name, duration: Math.max(2, Math.min(64, duration / 3)), color: colors[2], lane: 2, startBar: 0 }])
+      setClips(old => [...old.filter(c => !(c.lane === 2 && c.name === 'Reference · drop a song')), { id: Date.now(), name: file.name, duration: Math.max(1, Math.min(64, duration / (4 * 60 / bpm))), color: colors[2], lane: 2, startBar: 0 }])
       setAnalysis(['Audio loaded · ' + Math.floor(duration / 60) + ':' + String(Math.floor(duration % 60)).padStart(2, '0'), 'File metadata is available. BPM, key and stem analysis need a model integration.', 'Reference workflow is ready for the next development milestone.'])
       notify('Reference imported into the Playlist.')
     }
@@ -286,7 +308,7 @@ export default function App() {
       </aside>
       <main className="main-content">
         <div className="page-heading"><div><div className="eyebrow"><i/> YOUR CREATIVE SPACE</div><h1>{view==='Playlist'?'Arrangement':view}</h1><p>{view==='Reference Track'?'Discover the DNA of a track. Create something that feels like you.':'Build your next Afro House record, one layer at a time.'}</p></div><div className="heading-actions"><button className="small-icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15}/></button><button className="small-icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" onClick={redo}><Redo2 size={15}/></button><button className="secondary-button" onClick={()=>fileInput.current?.click()}><Upload size={15}/> Import audio</button><button className="secondary-button" onClick={async()=>{notify("Rendering Playlist arrangement to WAV…");try{let referenceAudio:AudioBuffer|undefined;if(audioUrl){const response=await fetch(audioUrl);const bytes=await response.arrayBuffer();const decodeContext=new AudioContext();try{referenceAudio=await decodeContext.decodeAudioData(bytes)}finally{await decodeContext.close()}}await exportArrangementWav({bpm,master,steps,notes,clips,channelLevels,referenceAudio,bars:8});notify("Arrangement WAV exported successfully.")}catch{notify("WAV export failed in this browser.")}}}><Download size={15}/> Export WAV</button><input ref={fileInput} type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden onChange={e=>importFile(e.target.files?.[0])}/><button className="primary-button" onClick={()=>setView('Reference Track')}><Sparkles size={15}/> AI Assistant</button></div></div>
-        {view==='Playlist'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Layers3 size={16}/></div><div><h2>Playlist</h2><p>Arrange patterns, vocals and audio on the timeline</p></div></div><div className="panel-tools"><span className="tiny-status"><i className="status-dot green"/> AUTO-SAVE READY</span><button className="small-icon-button" title="Add pattern clip" onClick={()=>{const id=Date.now();setClips(old=>[...old,{id,name:'New pattern',duration:4,color:colors[0],lane:0,startBar:0}]);setSelectedClipId(id);notify('New pattern clip added.')}}><Plus size={16}/></button><button className="small-icon-button" title="Duplicate selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={()=>{const clip=clips.find(c=>c.id===selectedClipId);if(!clip)return;const id=Date.now();setClips(old=>[...old,{...clip,id,name:clip.name+' copy',startBar:Math.min(7,(clip.startBar??0)+Math.max(1,Math.ceil(clip.duration)))}]);setSelectedClipId(id);notify('Clip duplicated.')}}><Copy size={15}/></button><button className="small-icon-button" title="Delete selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={()=>{setClips(old=>old.filter(c=>c.id!==selectedClipId));setSelectedClipId(null);notify('Clip deleted.')}}><Trash2 size={15}/></button><button className="small-icon-button" title="Import audio" onClick={()=>fileInput.current?.click()}><FolderOpen size={16}/></button></div></div><div className="timeline-wrap"><div className="timeline-ruler"><div className="track-label-spacer">TRACKS</div><div className="ruler-beats">{Array.from({length:9},(_,i)=><div key={i} className="ruler-number">{i+1}<span/></div>)}</div></div>{['Drums & Percussion','Bass & Groove','Reference / Audio','Melody & Atmosphere'].map((lane,i)=><div className="timeline-row" key={lane}><div className="track-label"><i className="track-color" style={{background:colors[i]}}/><span>{lane}</span><button onClick={()=>notify(lane+' track options')}>···</button></div><div className="timeline-grid" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const file=e.dataTransfer.files?.[0];if(file){importFile(file);return}const id=Number(e.dataTransfer.getData('text/plain'));if(!id)return;const rect=e.currentTarget.getBoundingClientRect();const bar=Math.max(0,Math.min(7,Math.floor(((e.clientX-rect.left)/rect.width)*8)));setClips(old=>old.map(c=>c.id===id?{...c,lane:i,startBar:bar}:c));setSelectedClipId(id);notify('Clip moved to bar '+(bar+1)+'.')}}>{Array.from({length:8},(_,j)=><div key={j} className="grid-beat"/>)}{clips.filter(c=>c.lane===i).map(c=><button key={c.id} draggable className="audio-clip" title="Drag to move this clip between bars and tracks" onDragStart={e=>{e.dataTransfer.setData('text/plain',String(c.id));e.dataTransfer.effectAllowed='move'}} style={{boxShadow:selectedClipId===c.id?'0 0 0 2px #ffffff':'none',left:((c.startBar??(c.id===3?0:(c.id%3))) * 12.5)+'%',width:Math.min(100-((c.startBar??0)*12.5),Math.max(12.5,Math.ceil(c.duration)*12.5))+'%',background:c.color+'20',borderColor:c.color+'70'}} onClick={()=>{setSelectedClipId(c.id);notify('Selected clip: '+c.name)}}><span className="clip-wave" style={{color:c.color}}>{Array.from({length:38},(_,k)=><i key={k} style={{height:(18+((k*17+c.id*11)%72))+'%'}}/>)}</span><span className="clip-name">{c.name}</span></button>)}</div></div>)}</div><div className="timeline-footer"><span><i className="status-dot green"/> 4 tracks</span><span>Snap: Bar <ChevronDown size={12}/></span><span>Zoom <button onClick={()=>notify('Zoom out')}>−</button> <button onClick={()=>notify('Zoom in')}>+</button></span><span className="footer-hint">Space: Play · Ctrl+Z: Undo · Ctrl+S: Save</span></div></section>}
+        {view==='Playlist'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Layers3 size={16}/></div><div><h2>Playlist</h2><p>Arrange patterns, vocals and audio on the timeline</p></div></div><div className="panel-tools"><span className="tiny-status"><i className="status-dot green"/> AUTO-SAVE READY</span><button className="small-icon-button" title="Add pattern clip" onClick={()=>{const id=Date.now();setClips(old=>[...old,{id,name:'New pattern',duration:4,color:colors[0],lane:0,startBar:0}]);setSelectedClipId(id);notify('New pattern clip added.')}}><Plus size={16}/></button><button className="small-icon-button" title="Duplicate selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={()=>{const clip=clips.find(c=>c.id===selectedClipId);if(!clip)return;const id=Date.now();setClips(old=>[...old,{...clip,id,name:clip.name+' copy',startBar:Math.min(7,(clip.startBar??0)+Math.max(1,Math.ceil(clip.duration)))}]);setSelectedClipId(id);notify('Clip duplicated.')}}><Copy size={15}/></button><button className="small-icon-button" title="Delete selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={()=>{setClips(old=>old.filter(c=>c.id!==selectedClipId));setSelectedClipId(null);notify('Clip deleted.')}}><Trash2 size={15}/></button><button className="small-icon-button" title="Import audio" onClick={()=>fileInput.current?.click()}><FolderOpen size={16}/></button></div></div><div className="timeline-wrap"><div className="timeline-ruler"><div className="track-label-spacer">TRACKS</div><div className="ruler-beats">{Array.from({length:9},(_,i)=><div key={i} className="ruler-number">{i+1}<span/></div>)}</div></div>{['Drums & Percussion','Bass & Groove','Reference / Audio','Melody & Atmosphere'].map((lane,i)=><div className="timeline-row" key={lane}><div className="track-label"><i className="track-color" style={{background:colors[i]}}/><span>{lane}</span><button onClick={()=>notify(lane+' track options')}>···</button></div><div className="timeline-grid" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const file=e.dataTransfer.files?.[0];if(file){importFile(file);return}const id=Number(e.dataTransfer.getData('text/plain'));if(!id)return;const rect=e.currentTarget.getBoundingClientRect();const bar=Math.max(0,Math.min(7,Math.floor(((e.clientX-rect.left)/rect.width)*8)));setClips(old=>old.map(c=>c.id===id?{...c,lane:i,startBar:bar}:c));setSelectedClipId(id);notify('Clip moved to bar '+(bar+1)+'.')}}>{Array.from({length:8},(_,j)=><div key={j} className="grid-beat"/>)}<div className="playhead-line" style={{left:((playheadStep/128)*100)+'%'}} aria-hidden="true"/>{clips.filter(c=>c.lane===i).map(c=><button key={c.id} draggable className="audio-clip" title="Drag to move this clip between bars and tracks" onDragStart={e=>{e.dataTransfer.setData('text/plain',String(c.id));e.dataTransfer.effectAllowed='move'}} style={{boxShadow:selectedClipId===c.id?'0 0 0 2px #ffffff':'none',left:((c.startBar??(c.id===3?0:(c.id%3))) * 12.5)+'%',width:Math.min(100-((c.startBar??0)*12.5),Math.max(12.5,Math.ceil(c.duration)*12.5))+'%',background:c.color+'20',borderColor:c.color+'70'}} onClick={()=>{setSelectedClipId(c.id);notify('Selected clip: '+c.name)}}><span className="clip-wave" style={{color:c.color}}>{Array.from({length:38},(_,k)=><i key={k} style={{height:(18+((k*17+c.id*11)%72))+'%'}}/>)}</span><span className="clip-name">{c.name}</span></button>)}</div></div>)}</div><div className="timeline-footer"><span><i className="status-dot green"/> 4 tracks</span><span>Snap: Bar <ChevronDown size={12}/></span><span>Zoom <button onClick={()=>notify('Zoom out')}>−</button> <button onClick={()=>notify('Zoom in')}>+</button></span><span className="footer-hint">Space: Play · Ctrl+Z: Undo · Ctrl+S: Save</span></div></section>}
         {view==='Channel Rack'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Drum size={16}/></div><div><h2>Channel Rack</h2><p>Build a 16-step groove · click a step to toggle it</p></div></div><button className="secondary-button compact" onClick={()=>setSteps(rows=>rows.map((_,r)=>Array.from({length:16},(_,i)=>r===0?i%4===0:r===1?i===4||i===12:r===2?i%2===0:i%4===3)))}>Reset pattern</button></div><div className="step-grid"><div className="step-header"><span>CHANNEL</span>{Array.from({length:16},(_,i)=><span key={i} className={i%4===0?'beat-start':''}>{i+1}</span>)}</div>{drumNames.map((name,r)=><div className="step-row" key={name}><button className="channel-name" onClick={()=>void preview([65,180,800,230][r])}><i style={{background:colors[r]}}/><span>{name}</span><Play size={12}/></button>{steps[r].map((on,i)=><button key={i} aria-label={name+' step '+(i+1)} className={'step '+(on?'on on-'+r:'')+' '+(i%4===0?'beat-start':'')} onClick={()=>setSteps(old=>old.map((row,j)=>j!==r?row:row.map((v,k)=>k===i?!v:v)))}/>)}</div>)}</div><div className="rack-footer"><span>{steps.reduce((n,row)=>n+row.filter(Boolean).length,0)} active steps</span><button className="primary-button" onClick={()=>{setView('Playlist');notify('Pattern ready to arrange.')}}><Plus size={15}/> Add pattern to Playlist</button></div></section>}
         {view==='Piano Roll'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><Music2 size={16}/></div><div><h2>Piano Roll</h2><p>Click the grid to add or remove notes · A minor</p></div></div><button className="secondary-button compact" onClick={()=>setNotes([])}>Clear notes</button></div><div className="piano-grid-wrap"><div className="piano-keys">{['C5','B4','A♯4','A4','G4','F♯4','F4','E4','D♯4','D4','C♯4','C4'].map((key,i)=><div key={key} className={key.includes('♯')?'black-key':'white-key'}>{key}</div>)}</div><div className="piano-grid">{Array.from({length:12},(_,row)=><div className={'piano-row '+([0,3,7,10].includes(row)?'root-row':'')} key={row}>{Array.from({length:16},(_,col)=><button key={col} className={'piano-cell '+(col%4===0?'bar-cell':'')} onClick={()=>{const pitch=11-row;const found=notes.some(n=>n.step===col&&n.pitch===pitch);setNotes(old=>found?old.filter(n=>!(n.step===col&&n.pitch===pitch)):[...old,{id:Date.now(),step:col,pitch}])}}/>)}{notes.filter(n=>n.pitch===11-row).map(n=><button key={n.id} className="midi-note" style={{left:(n.step/16*100)+'%'}} onClick={()=>setNotes(old=>old.filter(x=>x.id!==n.id))} title="Click to remove note"/>)}</div>)}</div></div><div className="piano-footer"><span>{notes.length} notes</span><span>Snap: 1/4 beat</span><span>Velocity <span className="velocity-bars">{notes.map(n=><i key={n.id} style={{height:(30+(n.pitch*7)%65)+'%'}}/>)}</span></span></div></section>}
         {view==='Mixer'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Mixer</h2><p>Channel levels · preview controls</p></div></div><button className="secondary-button compact" onClick={()=>{setMaster(78);setChannelLevels([78,66,72,55,60])}}>Reset levels</button></div><div className="mixer-channels">{['Master','Kick','Percussion','Bass','Atmosphere','Reference'].map((name,i)=><div className="mixer-channel" key={name}><span className="mixer-number">0{i+1}</span><strong>{name}</strong><div className="meter"><i style={{height:[74,62,48,68,37,53][i]+'%'}}/><i style={{height:[63,53,41,57,29,44][i]+'%'}}/></div><input aria-label={name+' volume'} type="range" min="0" max="100" value={i===0?master:channelLevels[i-1]} onChange={e=>{const value=Number(e.target.value);if(i===0)setMaster(value);else setChannelLevels(old=>old.map((v,j)=>j===i-1?value:v))}}/><span className="db-value">{(20*Math.log10(Math.max(0.001,(i===0?master:channelLevels[i-1])/100))).toFixed(1)} dB</span><button className="mute-button" onClick={e=>e.currentTarget.classList.toggle('muted')}>M</button></div>)}</div><p className="mixer-note"><Volume2 size={14}/> Full channel routing and effects need the dedicated audio engine.</p></section>}
