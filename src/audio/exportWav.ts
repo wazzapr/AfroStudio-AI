@@ -1,4 +1,4 @@
-export type ExportNote = { id: number; step: number; pitch: number }
+export type ExportNote = { id: number; step: number; pitch: number; duration?: number; velocity?: number }
 
 type ExportClip = { lane: number; duration: number; startBar?: number }
 
@@ -68,7 +68,7 @@ function addBass(ctx: OfflineAudioContext, time: number, pitch: number, master: 
   osc.stop(time + 0.2)
 }
 
-function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number) {
+function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number, duration: number, velocity: number) {
   const osc = ctx.createOscillator()
   const env = ctx.createGain()
   const filter = ctx.createBiquadFilter()
@@ -77,11 +77,12 @@ function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: 
   filter.type = 'lowpass'
   filter.frequency.value = 2400
   env.gain.setValueAtTime(0.0001, time)
-  env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)), time + 0.025)
-  env.gain.exponentialRampToValueAtTime(0.0001, time + 0.22)
+  const noteDuration = Math.max(0.04, Math.min(2, duration))
+  env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)) * Math.max(0, Math.min(1, velocity / 127)), time + 0.025)
+  env.gain.setTargetAtTime(0.0001, time + Math.max(0.03, noteDuration - 0.04), 0.025)
   osc.connect(filter).connect(env).connect(ctx.destination)
   osc.start(time)
-  osc.stop(time + 0.23)
+  osc.stop(time + noteDuration)
 }
 
 function encodeWav(buffer: AudioBuffer): Blob {
@@ -156,7 +157,7 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
       addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, master, channelLevels[2] ?? 100)
     }
     if (activeAt(3, bar)) {
-      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100))
+      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100))
     }
   }
 
