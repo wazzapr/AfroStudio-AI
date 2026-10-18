@@ -137,14 +137,20 @@ export default function App() {
   const generateAfroHouseIdea = () => {
     const selected = new Set(generationElements)
     const referenceTempo = audioUrl && detectedBpm ? detectedBpm : null
+    const sampleRules = [/kick|bd|bass.?drum/i, /clap|snare|rim/i, /hat|shaker|cymbal|top.?perc/i, /conga|bongo|tom|hand.?perc/i]
+    const matchedSamples = sampleRules.map(rule => drumSamples.find(sample => rule.test(sample.name))?.id ?? '')
+    const matchedSampleCount = matchedSamples.filter(Boolean).length
     if (referenceTempo) setBpm(referenceTempo)
     if (selected.size === 0) { notify('Select at least one element to generate.'); return }
-    if (selected.has('Drums')) setSteps([
-      Array.from({length:16},(_,i)=>i%4===0),
-      Array.from({length:16},(_,i)=>i===4||i===12),
-      Array.from({length:16},(_,i)=>i%2===0 || i===11 || i===15),
-      Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>0.22),
-    ])
+    if (selected.has('Drums')) {
+      setSteps([
+        Array.from({length:16},(_,i)=>i%4===0),
+        Array.from({length:16},(_,i)=>i===4||i===12),
+        Array.from({length:16},(_,i)=>i%2===0 || i===11 || i===15),
+        Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>0.22),
+      ])
+      if (matchedSampleCount) setRowSampleIds(old => old.map((id, row) => matchedSamples[row] || id))
+    }
     if (selected.has('Melody') || selected.has('Chords') || selected.has('Atmosphere')) {
       const scale = [0,2,3,5,7,8,10]
       const positions = selected.has('Atmosphere') ? [0,4,8,12] : [0,2,5,7,9,12,14,15]
@@ -161,7 +167,8 @@ export default function App() {
     if (selected.has('Drums')) setClips(old=>old.some(c=>c.lane===0)?old:[...old,{id:Date.now()+21,name:'Generated Afro groove',duration:8,color:colors[0],lane:0,startBar:0}])
     if (selected.has('Melody') || selected.has('Chords')) setClips(old=>old.some(c=>c.lane===3)?old:[...old,{id:Date.now()+22,name:'Generated melody',duration:8,color:colors[3],lane:3,startBar:0}])
     setView('Playlist')
-    notify(referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM). Audio remixing and stem separation are not implemented yet.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.')
+    const sampleNote = selected.has('Drums') && matchedSampleCount ? ' Matched ' + matchedSampleCount + ' imported drum samples by filename.' : ''
+    notify((referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM). Audio remixing and stem separation are not implemented yet.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.') + sampleNote)
   }
   const duplicatePattern = () => {
     const selected = clips.find(clip => clip.id === selectedClipId)
@@ -359,7 +366,7 @@ export default function App() {
 
   const notify = (s: string) => { setToast(s); window.setTimeout(() => setToast(''), 2600) }
   const importDrumSamples = async (files: FileList | File[]) => {
-    const chosen = Array.from(files).filter(file => file.type.startsWith('audio/') || /\\.(wav|mp3|ogg|flac|m4a|aiff?)$/i.test(file.name))
+    const chosen = Array.from(files).filter(file => file.type.startsWith('audio/') || /\.(wav|mp3|ogg|flac|m4a|aiff?)$/i.test(file.name))
     if (!chosen.length) { notify('Choose audio samples such as WAV, MP3, OGG or FLAC.'); return }
     setLoadingSamples(true)
     try {
