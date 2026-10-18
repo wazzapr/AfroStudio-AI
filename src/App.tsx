@@ -236,6 +236,12 @@ export default function App() {
       const bar = Math.floor(position / 16)
       const step = position % 16
       const current = playbackStateRef.current
+      // Follow the real arrangement length instead of always stopping after eight bars.
+      // The empty reference placeholder is only a drop target, not a 16-bar song.
+      const arrangementBars = Math.max(8, Math.min(16, Math.ceil(Math.max(8, ...current.clips
+        .filter(clip => !(clip.lane === 2 && clip.name === 'Reference · drop a song'))
+        .map(clip => (clip.startBar ?? 0) + Math.max(1, clip.duration)))))
+      const arrangementEndStep = arrangementBars * 16
       if (clipActiveAt(0, bar)) current.steps.forEach((row, rowIndex) => { if (row[step]) triggerDrum(ctx, rowIndex) })
       if (clipActiveAt(1, bar) && [0, 6, 8, 14].includes(step)) triggerNote(ctx, step % 8 === 0 ? 0 : 3, 0.72, 2)
       if (clipActiveAt(3, bar)) current.notes.filter(note => note.step === step).forEach(note => triggerNote(ctx, note.pitch, note.velocity / 127, 3, note.duration * 60 / bpm / 4))
@@ -251,7 +257,7 @@ export default function App() {
         }
       } else if (audio && !audio.paused) audio.pause()
       setPlayheadStep(position)
-      if (position >= 127) {
+      if (position >= arrangementEndStep - 1) {
         stepRef.current = 0
         setPlayheadStep(0)
         setPlaying(false)
