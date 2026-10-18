@@ -37,6 +37,7 @@ export default function App() {
   const [referencePreviewing, setReferencePreviewing] = useState(false)
   const [analysis, setAnalysis] = useState<string[]>([])
   const [detectedBpm, setDetectedBpm] = useState<number | null>(null)
+  const [referenceGroove, setReferenceGroove] = useState<'sparse' | 'steady' | 'busy' | null>(null)
   const [analyzingReference, setAnalyzingReference] = useState(false)
   const [prompt, setPrompt] = useState('Warm, organic Afro House groove with deep bass and sunset atmosphere')
   const [generationElements, setGenerationElements] = useState<string[]>(['Drums','Bass','Melody'])
@@ -260,8 +261,8 @@ export default function App() {
       setSteps([
         Array.from({length:16},(_,i)=>i%4===0),
         Array.from({length:16},(_,i)=>i===4||i===12),
-        Array.from({length:16},(_,i)=>i%2===0 || i===11 || i===15),
-        Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>0.22),
+        Array.from({length:16},(_,i)=>referenceGroove==='sparse' ? [0,4,8,12].includes(i) : referenceGroove==='busy' ? (i%2===0 || [3,7,11,15].includes(i)) : (i%2===0 || i===11 || i===15)),
+        Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>(referenceGroove==='sparse'?0.55:referenceGroove==='busy'?0.08:0.22)),
       ])
       if (matchedSampleCount) setRowSampleIds(old => old.map((id, row) => matchedSamples[row] || id))
     }
@@ -282,7 +283,7 @@ export default function App() {
     if (selected.has('Melody') || selected.has('Chords')) setClips(old=>old.some(c=>c.lane===3)?old:[...old,{id:Date.now()+22,name:'Generated melody',duration:8,color:colors[3],lane:3,startBar:0}])
     setView('Playlist')
     const sampleNote = selected.has('Drums') && matchedSampleCount ? ' Matched ' + matchedSampleCount + ' imported drum samples by filename.' : ''
-    notify((referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM). Audio remixing and stem separation are not implemented yet.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.') + sampleNote)
+    notify((referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM)' + (referenceGroove ? ' using the rough ' + referenceGroove + ' transient profile.' : '.') + ' This is heuristic pattern generation, not AI audio remixing or stem separation.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.') + sampleNote)
   }
   const duplicatePattern = () => {
     const selected = clips.find(clip => clip.id === selectedClipId)
@@ -591,8 +592,12 @@ export default function App() {
         if (score > bestScore) { bestScore = score; bestTempo = tempo }
       }
       if (requestId !== audioImportRequestRef.current) return
+      const activeOnsets = onset.reduce((count, value) => count + (value > mean * 2.2 ? 1 : 0), 0)
+      const onsetRate = activeOnsets / Math.max(1, seconds)
+      const groove = onsetRate < 3.5 ? 'sparse' : onsetRate > 8 ? 'busy' : 'steady'
       setDetectedBpm(bestTempo || null)
-      setAnalysis(old => [...old, bestTempo ? 'Experimental local BPM estimate: about ' + bestTempo + ' BPM (check by ear).' : 'Local BPM estimate unavailable.'])
+      setReferenceGroove(groove)
+      setAnalysis(old => [...old, bestTempo ? 'Experimental local BPM estimate: about ' + bestTempo + ' BPM (check by ear).' : 'Local BPM estimate unavailable.', 'Experimental transient profile: ' + groove + ' (' + onsetRate.toFixed(1) + ' prominent changes/second). This is a rough audio heuristic, not AI genre recognition.'])
     } catch {
       if (requestId === audioImportRequestRef.current) setAnalysis(old => [...old, 'Local analysis could not decode this format in the browser.'])
     } finally {
