@@ -34,6 +34,7 @@ export default function App() {
   const sampleInput = useRef<HTMLInputElement>(null)
   const [toast, setToast] = useState('')
   const [referenceName, setReferenceName] = useState('')
+  const [referenceFile, setReferenceFile] = useState<File | null>(null)
   const [referencePreviewing, setReferencePreviewing] = useState(false)
   const [analysis, setAnalysis] = useState<string[]>([])
   const [detectedBpm, setDetectedBpm] = useState<number | null>(null)
@@ -322,11 +323,13 @@ export default function App() {
     }
     setAiAudioGenerating(true)
     try {
-      const response = await fetch(baseUrl + '/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim(), bpm, duration: 30 }),
-      })
+      const requestBody = new FormData()
+      requestBody.set('prompt', prompt.trim())
+      requestBody.set('bpm', String(bpm))
+      requestBody.set('duration', '30')
+      requestBody.set('style_influence', String(styleInfluence / 100))
+      if (referenceFile) requestBody.set('reference_audio', referenceFile, referenceFile.name)
+      const response = await fetch(baseUrl + '/generate', { method: 'POST', body: requestBody })
       const result: unknown = await response.json()
       if (!response.ok) {
         const message = result && typeof result === 'object' && 'message' in result ? String((result as {message: unknown}).message) : 'The local AI engine rejected the generation request.'
@@ -735,6 +738,7 @@ export default function App() {
       if (requestId !== audioImportRequestRef.current) { discardStaleImport(); return }
       const duration = Number.isFinite(audio.duration) ? audio.duration : 30
       setReferenceName(file.name)
+      setReferenceFile(file)
       setAudioUrl(url); audioElement.current = audio
       audio.onended = () => setReferencePreviewing(false)
       const barDuration = 4 * 60 / bpm; const clipStart = Math.max(0, Math.min(15, Math.floor(startBar))); const clipBars = Math.max(1, Math.min(16 - clipStart, Math.ceil(duration / barDuration))); setClips(old => [...old.filter(c => !(c.lane === 2 && c.name === 'Reference · drop a song')), { id: Date.now(), name: file.name, duration: clipBars, color: colors[2], lane: 2, startBar: clipStart }])
@@ -747,7 +751,7 @@ export default function App() {
     }
     audio.onerror = () => {
       if (requestId !== audioImportRequestRef.current) { discardStaleImport(); return }
-      setReferenceName(file.name); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio
+      setReferenceName(file.name); setReferenceFile(file); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio
       audio.onended = () => setReferencePreviewing(false)
     }
     audio.load()
@@ -758,6 +762,7 @@ export default function App() {
     audioElement.current = null
     setReferencePreviewing(false)
     setReferenceName('')
+    setReferenceFile(null)
     setAnalysis([])
     setDetectedBpm(null)
     setAnalyzingReference(false)
