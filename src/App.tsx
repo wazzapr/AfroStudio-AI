@@ -265,7 +265,7 @@ export default function App() {
         Array.from({length:16},(_,i)=>i%4===0),
         Array.from({length:16},(_,i)=>i===4||i===12),
         Array.from({length:16},(_,i)=>{const density=grooveAmount/100;const profileBias=referenceGroove==='sparse'?-0.18:referenceGroove==='busy'?0.18:0;const threshold=Math.max(0.18,Math.min(0.95,0.25+density*0.55+profileBias*styleInfluence/100));return i%2===0 ? Math.random()<threshold : Math.random()<Math.max(0,density-0.58)*0.7}),
-        Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>(0.68-(styleInfluence/100)*0.24-(grooveAmount/100)*0.15))),
+        Array.from({length:16},(_,i)=>[3,7,11,15].includes(i) && Math.random()>(0.68-(styleInfluence/100)*0.24-(grooveAmount/100)*0.15)),
       ])
       if (matchedSampleCount) setRowSampleIds(old => old.map((id, row) => matchedSamples[row] || id))
     }
