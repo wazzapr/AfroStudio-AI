@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
                 "service": "afrostudio-local-engine",
                 "model": {"installed": None, "ready": False, "name": "ACE-Step 1.5 API (model readiness unverified)" if provider["available"] else None},
                 "provider": provider,
-                "capabilities": {"health_check": True, "music_generation": provider["available"], "reference_audio_upload": False},
+                "capabilities": {"health_check": True, "music_generation": provider["available"], "reference_audio_upload": True},
                 "message": "ACE-Step API is reachable; model readiness is not verified until a generation succeeds." if provider["available"] else "Bridge is running; start a compatible local ACE-Step API to enable AI audio generation."
             })
         elif self.path.startswith("/tasks/"):
