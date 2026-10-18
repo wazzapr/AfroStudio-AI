@@ -8,7 +8,7 @@ The project is an early, actively developed browser-based studio foundation. The
 
 - Playlist with draggable pattern/audio clips, an arrangement playhead, tempo control, and transport.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
-- 16-step Channel Rack and editable Piano Roll.
+- 16-step Channel Rack and Piano Roll with selectable notes, adjustable step-length and velocity, and note deletion.
 - Mixer level controls and working mute toggles for the available preview channels.
 - Starter playback effects that can be toggled on/off: low-cut filter, dynamics compressor, short echo, and tempo-synced delay.
 - JSON project export/import and WAV arrangement export.
