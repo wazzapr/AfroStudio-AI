@@ -403,12 +403,12 @@ export default function App() {
     const chosen = Array.from(files).filter(file => file.type.startsWith('audio/') || /\.(wav|mp3|ogg|flac|m4a|aiff?)$/i.test(file.name))
     if (!chosen.length) { notify('Choose audio samples such as WAV, MP3, OGG or FLAC.'); return [] }
     setLoadingSamples(true)
+    const loaded: DrumSample[] = []
     try {
       const ctx = audioContextRef.current || audioContext || new window.AudioContext()
       if (!audioContextRef.current) audioContextRef.current = ctx
       if (!audioContext) setAudioContext(ctx)
       if (ctx.state === 'suspended') await ctx.resume()
-      const loaded: DrumSample[] = []
       for (const file of chosen) {
         if (file.size > 40 * 1024 * 1024) { notify(file.name + ' skipped: sample is over 40 MB.'); continue }
         try {
