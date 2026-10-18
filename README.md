@@ -8,7 +8,7 @@ The project is an early, actively developed browser-based studio foundation. The
 
 - Playlist with draggable pattern/audio clips, an arrangement playhead, tempo control, and transport.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
-- 16-step Channel Rack and Piano Roll with selectable notes, adjustable step-length and velocity, and note deletion.
+- 16-step Channel Rack and Piano Roll with selectable notes, drag-to-move pitch/time editing on a 1-step grid, right-edge note resizing, adjustable step-length and velocity, and note deletion.
 - Mixer level controls and working mute toggles for the available preview channels.
 - Starter playback effects that can be toggled on/off: low-cut filter, dynamics compressor, short echo, and tempo-synced delay.
 - JSON project export/import and WAV arrangement export.
@@ -21,7 +21,7 @@ The project is an early, actively developed browser-based studio foundation. The
 - Imported reference audio is not yet analyzed for BPM, key, stems, or musical structure.
 - AI reference-track controls currently help shape locally generated patterns; they do not generate a full song from uploaded audio.
 - The built-in effects are lightweight starter processing, not a polished per-channel effects rack; reverb is currently approximated with a short echo, and effect parameters/routing are not yet editable.
-- VST3/plugin hosting, sample library management, automation, advanced MIDI editing, and a low-latency desktop audio engine remain future milestones.
+- VST3/plugin hosting, sample library management, automation, MIDI snap customization, advanced MIDI editing, and a low-latency desktop audio engine remain future milestones.
 - The app is currently a Vite web app. Desktop packaging is a later milestone.
 
 ## Product principles
