@@ -49,13 +49,13 @@ export default function App() {
   const stepRef = useRef(0)
   const playbackStateRef = useRef({ clips, steps, notes, master, channelLevels, mutedChannels, enabledEffects })
   playbackStateRef.current = { clips, steps, notes, master, channelLevels, mutedChannels, enabledEffects }
-  type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number;duration:number;velocity:number}[]; master:number; channelLevels:number[] }
+  type Snapshot = { bpm:number; clips:Clip[]; steps:boolean[][]; notes:{id:number;step:number;pitch:number;duration:number;velocity:number}[]; master:number; channelLevels:number[]; enabledEffects:boolean[] }
   const undoStack = useRef<Snapshot[]>([])
   const redoStack = useRef<Snapshot[]>([])
   const applyingHistory = useRef(false)
   const lastSnapshot = useRef<Snapshot | null>(null)
-  const projectRef = useRef<Snapshot>({ bpm, clips, steps, notes, master, channelLevels })
-  const currentSnapshot = () => ({ bpm, clips, steps, notes, master, channelLevels })
+  const projectRef = useRef<Snapshot>({ bpm, clips, steps, notes, master, channelLevels, enabledEffects })
+  const currentSnapshot = () => ({ bpm, clips, steps, notes, master, channelLevels, enabledEffects })
   useEffect(() => {
     const current = currentSnapshot()
     projectRef.current = current
@@ -67,10 +67,10 @@ export default function App() {
       redoStack.current = []
       lastSnapshot.current = current
     }
-  }, [bpm, clips, steps, notes, master, channelLevels])
+  }, [bpm, clips, steps, notes, master, channelLevels, enabledEffects])
   const applySnapshot = (snapshot: Snapshot) => {
     applyingHistory.current = true
-    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master); setChannelLevels(snapshot.channelLevels)
+    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master); setChannelLevels(snapshot.channelLevels); setEnabledEffects(snapshot.enabledEffects ?? [false,false,false,false])
     projectRef.current = snapshot; lastSnapshot.current = snapshot
   }
   const undo = () => {
@@ -277,7 +277,7 @@ export default function App() {
     audio.load()
   }
   const saveProject = () => {
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, prompt }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, prompt, enabledEffects }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
     notify('Project data exported.')
@@ -315,6 +315,7 @@ export default function App() {
       setNotes((data.notes as {id:number;step:number;pitch:number;duration?:number;velocity?:number}[]).map(note => ({...note,duration:note.duration ?? 2,velocity:note.velocity ?? 100})))
       setSelectedNoteId(null)
       setMutedChannels([false,false,false,false,false,false])
+      setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
