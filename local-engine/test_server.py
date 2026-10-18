@@ -37,6 +37,7 @@ class EngineApiTests(unittest.TestCase):
     def test_status_does_not_claim_generation_without_provider(self, _probe):
         result = self.get_json("/status")
         self.assertFalse(result["capabilities"]["music_generation"])
+        self.assertTrue(result["capabilities"]["reference_audio_upload"])
         self.assertFalse(result["model"]["ready"])
 
     def test_unknown_route_returns_404(self):
