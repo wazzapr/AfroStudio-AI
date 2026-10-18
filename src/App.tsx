@@ -99,7 +99,7 @@ export default function App() {
       positions.forEach((step,i) => {
         const root = scale[Math.floor(Math.random()*scale.length)]
         if (selected.has('Chords')) [root,(root+3)%12,(root+7)%12].forEach((pitch,j)=>generated.push({id:Date.now()+i*10+j,step,pitch,duration:2,velocity:100}))
-        else if (selected.has('Atmosphere')) [root,Math.min(11,root+4)].forEach((pitch,j)=>generated.push({id:Date.now()+i*10+j,step,pitch}))
+        else if (selected.has('Atmosphere')) [root,Math.min(11,root+4)].forEach((pitch,j)=>generated.push({id:Date.now()+i*10+j,step,pitch,duration:4,velocity:82}))
         else generated.push({id:Date.now()+i,step,pitch:root,duration:2,velocity:100})
       })
       setNotes(generated)
