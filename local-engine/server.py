@@ -83,7 +83,8 @@ def generation_worker(task_id, prompt, bpm, duration, reference_bytes=None, refe
             TASKS[task_id]["provider_task_id"] = provider_task_id
             TASKS[task_id]["status"] = "running"
             TASKS[task_id]["message"] = "ACE-Step is generating audio…"
-        deadline = time.monotonic() + 1200
+        timeout_seconds = max(1200, duration * 20)
+        deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
             result_data = json_request(ACESTEP_API_URL + "/query_result", {"task_id_list": [provider_task_id]}, timeout=15)
             entries = result_data if isinstance(result_data, list) else result_data.get("data", [])
@@ -121,7 +122,7 @@ def generation_worker(task_id, prompt, bpm, duration, reference_bytes=None, refe
                     TASKS[task_id].update({"status": "succeeded", "message": "Audio generated.", "audio": audio_bytes, "content_type": response.headers.get("Content-Type", "audio/wav")})
                 return
             time.sleep(3)
-        raise RuntimeError("ACE-Step generation timed out after 20 minutes.")
+        raise RuntimeError(f"ACE-Step generation timed out after {timeout_seconds // 60} minutes.")
     except (HTTPError, URLError, TimeoutError, ValueError, RuntimeError, OSError) as error:
         with TASKS_LOCK:
             TASKS[task_id].update({"status": "failed", "message": str(error)[:500]})
