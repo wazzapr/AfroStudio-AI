@@ -11,6 +11,7 @@ type ExportOptions = {
   channelLevels?: number[]
   referenceAudio?: AudioBuffer
   bars?: number
+  selectedInstrument?: string
 }
 
 function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number, channelLevel: number) {
@@ -68,18 +69,25 @@ function addBass(ctx: OfflineAudioContext, time: number, pitch: number, master: 
   osc.stop(time + 0.2)
 }
 
-function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number, duration: number, velocity: number) {
+function addNote(ctx: OfflineAudioContext, time: number, pitch: number, master: number, channelLevel: number, duration: number, velocity: number, selectedInstrument = 'Soft Keys') {
   const osc = ctx.createOscillator()
   const env = ctx.createGain()
   const filter = ctx.createBiquadFilter()
-  osc.type = 'triangle'
-  osc.frequency.value = 440 * Math.pow(2, (60 + pitch - 69) / 12)
+  const presets: Record<string, {wave: OscillatorType; cutoff: number; gain: number; octave: number; attack: number; release: number}> = {
+    'Deep Kick': {wave:'sine', cutoff:260, gain:0.34, octave:-12, attack:0.006, release:0.16},
+    'Warm Bass': {wave:'sawtooth', cutoff:520, gain:0.22, octave:-12, attack:0.012, release:0.1},
+    'Soft Keys': {wave:'triangle', cutoff:2400, gain:0.14, octave:0, attack:0.025, release:0.18},
+    'Air Texture': {wave:'sine', cutoff:5200, gain:0.12, octave:12, attack:0.08, release:0.32},
+  }
+  const preset = presets[selectedInstrument] ?? presets['Soft Keys']
+  osc.type = preset.wave
+  osc.frequency.value = 440 * Math.pow(2, (60 + pitch + preset.octave - 69) / 12)
   filter.type = 'lowpass'
-  filter.frequency.value = 2400
+  filter.frequency.value = preset.cutoff
   env.gain.setValueAtTime(0.0001, time)
   const noteDuration = Math.max(0.04, Math.min(2, duration))
-  env.gain.exponentialRampToValueAtTime(0.14 * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)) * Math.max(0, Math.min(1, velocity / 127)), time + 0.025)
-  env.gain.setTargetAtTime(0.0001, time + Math.max(0.03, noteDuration - 0.04), 0.025)
+  env.gain.exponentialRampToValueAtTime(preset.gain * master / 100 * Math.max(0, Math.min(1, channelLevel / 100)) * Math.max(0, Math.min(1, velocity / 127)), time + preset.attack)
+  env.gain.setTargetAtTime(0.0001, time + Math.max(0.03, noteDuration - preset.release), Math.max(0.025, preset.release / 4))
   osc.connect(filter).connect(env).connect(ctx.destination)
   osc.start(time)
   osc.stop(time + noteDuration)
@@ -120,7 +128,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([output], { type: 'audio/wav' })
 }
 
-export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8 }: ExportOptions): Promise<void> {
+export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8, selectedInstrument = 'Soft Keys' }: ExportOptions): Promise<void> {
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
@@ -158,7 +166,7 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
       addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, master, channelLevels[2] ?? 100)
     }
     if (activeAt(3, bar)) {
-      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100))
+      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100, selectedInstrument))
     }
   }
 
