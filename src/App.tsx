@@ -102,7 +102,7 @@ export default function App() {
             setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture'].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Soft Keys')
             if (typeof data.prompt === 'string') setPrompt(data.prompt)
             if (Array.isArray(data.generationElements) && data.generationElements.every(value => ['Drums','Bass','Melody','Chords','Atmosphere'].includes(String(value)))) setGenerationElements(data.generationElements as string[])
-            if (Array.isArray(data.rowSampleNames) && data.rowSampleNames.length === 4 && data.rowSampleNames.every(name => typeof name === 'string')) setRowSampleIds(['','','',''])
+            if (Array.isArray(data.rowSampleIds) && data.rowSampleIds.length === 4 && data.rowSampleIds.every(id => typeof id === 'string')) setRowSampleIds(data.rowSampleIds as string[])
           }
         }
       }
@@ -112,7 +112,7 @@ export default function App() {
     autosaveReady.current = true
   }, [])
   useEffect(() => {
-    if (!autosaveReady.current) return
+    if (!autosaveReady.current || !sampleLibraryLoaded.current) return
     const timeout = window.setTimeout(() => {
       try {
         const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
