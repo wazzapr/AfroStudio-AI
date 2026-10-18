@@ -276,8 +276,30 @@ export default function App() {
       if (!result || typeof result !== 'object') throw new Error('The health endpoint did not return JSON.')
       const data = result as Record<string, unknown>
       if (data.status !== 'ok' && data.status !== 'healthy') throw new Error('Engine responded, but did not report status "ok" or "healthy".')
+      const health = data
+      let statusMessage = 'Engine is reachable, but it does not expose model status. Music generation is not confirmed.'
+      try {
+        const statusResponse = await fetch(baseUrl + '/status', { signal: controller.signal })
+        if (statusResponse.ok) {
+          const statusResult: unknown = await statusResponse.json()
+          if (statusResult && typeof statusResult === 'object') {
+            const statusData = statusResult as Record<string, unknown>
+            const model = statusData.model && typeof statusData.model === 'object' ? statusData.model as Record<string, unknown> : null
+            const capabilities = statusData.capabilities && typeof statusData.capabilities === 'object' ? statusData.capabilities as Record<string, unknown> : null
+            if (model?.ready === true && capabilities?.music_generation === true) {
+              statusMessage = 'A model reports ready. Audio generation still needs to be tested in the app.'
+            } else if (model?.installed === false) {
+              statusMessage = 'Local bridge connected, but no music model is installed yet. This connection does not generate audio.'
+            } else if (capabilities?.music_generation === false) {
+              statusMessage = 'Local bridge connected, but music generation is not enabled by this engine.'
+            }
+          }
+        }
+      } catch {
+        statusMessage = 'Engine is reachable. Model status endpoint is unavailable; music generation is not confirmed.'
+      }
       setLocalAiStatus('online')
-      setLocalAiMessage('Engine is reachable. Full music generation is not connected to this app yet.')
+      setLocalAiMessage(statusMessage)
     } catch (error) {
       setLocalAiStatus('offline')
       setLocalAiMessage(error instanceof Error && error.name === 'AbortError' ? 'Timed out. Make sure the local engine is running.' : 'Could not connect. The engine must run locally and allow requests from this app.')
