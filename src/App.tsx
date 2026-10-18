@@ -48,6 +48,7 @@ export default function App() {
   const [audioUrl, setAudioUrl] = useState('')
   const [playheadStep, setPlayheadStep] = useState(0)
   const audioElement = useRef<HTMLAudioElement | null>(null)
+  const audioImportRequestRef = useRef(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   useEffect(() => {
     const url = audioUrl
@@ -352,9 +353,17 @@ export default function App() {
   const importFile = (file?: File, startBar = 0) => {
     if (!file) return
     if (!file.type.startsWith('audio/') && !/\.(mp3|wav|flac|ogg|m4a|aiff?)$/i.test(file.name)) { notify('Choose an audio file such as WAV, MP3, FLAC or M4A.'); return }
+    const requestId = ++audioImportRequestRef.current
     const url = URL.createObjectURL(file)
     const audio = new Audio(url)
+    const discardStaleImport = () => {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      URL.revokeObjectURL(url)
+    }
     audio.onloadedmetadata = () => {
+      if (requestId !== audioImportRequestRef.current) { discardStaleImport(); return }
       const duration = Number.isFinite(audio.duration) ? audio.duration : 30
       setReferenceName(file.name)
       setAudioUrl(url); audioElement.current = audio
@@ -362,7 +371,10 @@ export default function App() {
       setAnalysis(['Audio loaded · ' + Math.floor(duration / 60) + ':' + String(Math.floor(duration % 60)).padStart(2, '0'), 'File metadata is available. BPM, key and stem analysis need a model integration.', 'Reference workflow is ready for the next development milestone.'])
       notify('Reference imported into the Playlist.')
     }
-    audio.onerror = () => { setReferenceName(file.name); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio }
+    audio.onerror = () => {
+      if (requestId !== audioImportRequestRef.current) { discardStaleImport(); return }
+      setReferenceName(file.name); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio
+    }
     audio.load()
   }
   const pianoDrag = useRef<{id:number;pointerId:number;startX:number;startY:number;step:number;pitch:number;duration:number;resizing:boolean} | null>(null)
