@@ -12,6 +12,7 @@ type ExportOptions = {
   referenceAudio?: AudioBuffer
   bars?: number
   selectedInstrument?: string
+  mutedChannels?: boolean[]
 }
 
 function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number, channelLevel: number) {
@@ -128,22 +129,23 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([output], { type: 'audio/wav' })
 }
 
-export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8, selectedInstrument = 'Soft Keys' }: ExportOptions): Promise<void> {
+export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8, selectedInstrument = 'Soft Keys', mutedChannels = [] }: ExportOptions): Promise<void> {
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
   const noteTail = Math.max(0.4, ...notes.map(note => (note.duration ?? 2) * secondsPerStep))
+  const effectiveMaster = mutedChannels[0] ? 0 : master
   const duration = safeBars * 4 * 60 / safeBpm + noteTail
   const sampleRate = 44100
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate)
   const totalSteps = safeBars * 16
-  if (referenceAudio) {
+  if (referenceAudio && !mutedChannels[5] && !mutedChannels[0]) {
     const referenceClip = clips.find(clip => clip.lane === 2)
     if (referenceClip) {
       const source = ctx.createBufferSource()
       const gain = ctx.createGain()
       source.buffer = referenceAudio
-      gain.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
+      gain.gain.value = Math.max(0, Math.min(1, effectiveMaster / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
       source.connect(gain).connect(ctx.destination)
       source.start(Math.max(0, (referenceClip.startBar ?? 0) * 4 * 60 / safeBpm))
     }
@@ -159,14 +161,14 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
     const bar = Math.floor(step / 16)
     if (activeAt(0, bar)) {
       steps.forEach((row, rowIndex) => {
-        if (row[patternStep]) addDrum(ctx, time, rowIndex, master, channelLevels[rowIndex === 0 ? 0 : 1] ?? 100)
+        if (row[patternStep] && !mutedChannels[rowIndex === 0 ? 1 : 2]) addDrum(ctx, time, rowIndex, effectiveMaster, channelLevels[rowIndex === 0 ? 0 : 1] ?? 100)
       })
     }
     if (activeAt(1, bar) && [0, 6, 8, 14].includes(patternStep)) {
-      addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, master, channelLevels[2] ?? 100)
+      if (!mutedChannels[3]) addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, effectiveMaster, channelLevels[2] ?? 100)
     }
     if (activeAt(3, bar)) {
-      notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, master, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100, selectedInstrument))
+      if (!mutedChannels[4]) notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, effectiveMaster, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100, selectedInstrument))
     }
   }
 
