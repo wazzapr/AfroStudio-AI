@@ -594,6 +594,28 @@ export default function App() {
       if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return }
       if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return }
       if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); duplicatePattern(); return }
+      if (!typing && view === 'Piano Roll' && selectedNoteId !== null && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault()
+        const selected = notes.find(note => note.id === selectedNoteId)
+        if (selected) {
+          const step = Math.min(15, selected.step + Math.max(1, selected.duration))
+          if (step === selected.step || step >= 16) { notify('There is no room to duplicate this note later in the pattern.'); return }
+          const copy = { ...selected, id: Date.now(), step, duration: Math.min(selected.duration, 16 - step) }
+          setNotes(old => [...old, copy]); setSelectedNoteId(copy.id); notify('Note duplicated.')
+        }
+        return
+      }
+      if (!typing && view === 'Piano Roll' && selectedNoteId !== null && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) {
+        event.preventDefault()
+        const horizontal = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+        const vertical = event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0
+        setNotes(old => old.map(note => {
+          if (note.id !== selectedNoteId) return note
+          if (event.shiftKey && horizontal !== 0) return { ...note, duration: Math.max(1, Math.min(16 - note.step, note.duration + horizontal)) }
+          return { ...note, step: Math.max(0, Math.min(15, note.step + horizontal)), pitch: Math.max(0, Math.min(11, note.pitch + vertical)) }
+        }))
+        return
+      }
       if (!typing && view === 'Playlist' && selectedClipId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setClips(old => old.filter(clip => clip.id !== selectedClipId)); setSelectedClipId(null); notify('Selected clip deleted.'); return }
       if (!typing && view === 'Piano Roll' && selectedNoteId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setNotes(old => old.filter(note => note.id !== selectedNoteId)); setSelectedNoteId(null); return }
       if (event.code === 'Space' && !typing) { event.preventDefault(); setPlaying(v => !v); return }
@@ -932,7 +954,7 @@ export default function App() {
     <div className="workspace">
       <aside className="sidebar"><div className="sidebar-label">WORKSPACE</div>{nav.map(({name,Icon})=><button key={name} className={view===name?'side-nav active':'side-nav'} onClick={()=>setView(name)}><Icon size={17}/><span>{name}</span>{name==='Playlist'&&<small>F5</small>}</button>)}
         <div className="sidebar-label plugins-label">TOOLS & AI</div><button className={view==='Reference Track'?'side-nav active':'side-nav'} onClick={()=>setView('Reference Track')}><WandSparkles size={17}/><span>Reference Track</span><b className="beta-tag">AI</b></button><button className={view==='Instruments'?'side-nav active':'side-nav'} onClick={()=>setView('Instruments')}><Disc3 size={17}/><span>Instruments</span></button><button className={view==='Effects'?'side-nav active':'side-nav'} onClick={()=>setView('Effects')}><Waves size={17}/><span>Effects</span></button><button className={view==='Updates'?'side-nav active':'side-nav'} onClick={()=>setView('Updates')}><RefreshCw size={17}/><span>Updates</span><b className="beta-tag">NEW</b></button>
-        <div className="sidebar-bottom"><div className="upgrade-card"><div className="upgrade-icon"><Sparkles size={17}/></div><strong>Your sound. Your rules.</strong><p>Local-first tools. No mandatory subscriptions.</p><button onClick={()=>setView('Reference Track')}>Explore AI tools <span>↗</span></button></div><button className="help-link" onClick={()=>notify('Shortcuts: Space Play/Stop · Ctrl+Z Undo · Ctrl+Shift+Z Redo · Ctrl+S Save · Ctrl+B Duplicate · Delete selected Piano Roll note · F5 Playlist · F6 Rack · F7 Piano Roll · F9 Mixer')}>? &nbsp; Help & shortcuts</button><div className="version">AFROSTUDIO AI <span>v0.1.0 · EARLY BUILD</span></div></div>
+        <div className="sidebar-bottom"><div className="upgrade-card"><div className="upgrade-icon"><Sparkles size={17}/></div><strong>Your sound. Your rules.</strong><p>Local-first tools. No mandatory subscriptions.</p><button onClick={()=>setView('Reference Track')}>Explore AI tools <span>↗</span></button></div><button className="help-link" onClick={()=>notify('Shortcuts: Space Play/Stop · Ctrl+Z Undo · Ctrl+Shift+Z Redo · Ctrl+S Save · Ctrl+B Duplicate clip · Ctrl+D Duplicate note · Arrow keys move selected Piano Roll note · Shift+Left/Right resize note · Delete selected Piano Roll note · F5 Playlist · F6 Rack · F7 Piano Roll · F9 Mixer')}>? &nbsp; Help & shortcuts</button><div className="version">AFROSTUDIO AI <span>v0.1.0 · EARLY BUILD</span></div></div>
       </aside>
       <main className="main-content">
         <div className="page-heading"><div><div className="eyebrow"><i/> YOUR CREATIVE SPACE</div><h1>{view==='Playlist'?'Arrangement':view}</h1><p>{view==='Reference Track'?'Discover the DNA of a track. Create something that feels like you.':'Build your next Afro House record, one layer at a time.'}</p></div><div className="heading-actions"><button className="small-icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15}/></button><button className="small-icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" onClick={redo}><Redo2 size={15}/></button><button className="secondary-button" onClick={()=>fileInput.current?.click()}><Upload size={15}/> Import audio</button><button className="secondary-button" onClick={async()=>{notify("Rendering Playlist arrangement to WAV…");try{let referenceAudio:AudioBuffer|undefined;if(audioUrl){const response=await fetch(audioUrl);const bytes=await response.arrayBuffer();const decodeContext=new AudioContext();try{referenceAudio=await decodeContext.decodeAudioData(bytes)}finally{await decodeContext.close()}}await exportArrangementWav({bpm,master,steps,notes,clips,channelLevels,referenceAudio,drumSamples:drumSamples.map(sample=>sample.buffer),drumSampleIds:drumSamples.map(sample=>sample.id),rowSampleIds,bars:Math.min(16,Math.max(8,...clips.filter(clip=>clip.lane!==2||Boolean(audioUrl)).map(clip=>Math.ceil((clip.startBar??0)+clip.duration)))),selectedInstrument,mutedChannels});notify("Arrangement WAV exported successfully.")}catch{notify("WAV export failed in this browser.")}}}><Download size={15}/> Export WAV</button><input ref={fileInput} type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden onChange={e=>importFile(e.target.files?.[0])}/><button className="primary-button" onClick={()=>setView('Reference Track')}><Sparkles size={15}/> AI Assistant</button></div></div>
