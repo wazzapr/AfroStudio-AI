@@ -12,6 +12,7 @@ The project is an early, actively developed browser-based studio foundation. Cur
 - Local procedural Afro House idea generation. This is not a trained AI music-generation model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting selected items.
+- An in-app Updates page that checks the latest commit on GitHub and opens a download of the latest branch ZIP. Because the app is currently a browser-based Vite app, this is a source-download helper, not yet a one-click self-installing updater.
 
 ## Windows setup status
 
