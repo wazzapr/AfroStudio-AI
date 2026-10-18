@@ -133,7 +133,7 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
       const source = ctx.createBufferSource()
       const gain = ctx.createGain()
       source.buffer = referenceAudio
-      gain.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevels[4] ?? 100) / 100)
+      gain.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, (channelLevels[4] ?? 100) / 100))
       source.connect(gain).connect(ctx.destination)
       source.start(Math.max(0, (referenceClip.startBar ?? 0) * 4 * 60 / safeBpm))
     }
