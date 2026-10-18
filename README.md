@@ -14,7 +14,7 @@ The project is an early, actively developed browser-based studio foundation. The
 - Starter playback effects that can be toggled on/off: low-cut filter, dynamics compressor, short echo, and tempo-synced delay.
 - JSON project export/import and WAV arrangement export that automatically extends up to 16 bars to cover the current clip arrangement.
 - Local procedural Afro House idea generation (patterns and notes); this is not a trained AI music-generation model.
-- Keyboard shortcuts for transport, navigation, undo/redo, duplication, and save.
+- Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting the selected Playlist clip or Piano Roll note. Ctrl/Cmd+B duplicates the selected Playlist clip into the next available bars, or duplicates clips into the second half when none is selected.
 
 ## Known limitations
 
