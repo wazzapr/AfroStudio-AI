@@ -52,6 +52,23 @@ class EngineApiTests(unittest.TestCase):
         self.assertEqual(error.exception.code, 400)
 
     @patch("server.probe_ace_step", return_value={"available": False, "url": "http://127.0.0.1:8001", "message": "ACE-Step not detected"})
+    def test_generate_accepts_multipart_reference_upload(self, _probe):
+        boundary = "----AfroStudioTestBoundary"
+        body = (
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"prompt\"\r\n\r\nwarm organic Afro House\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"bpm\"\r\n\r\n122\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"duration\"\r\n\r\n30\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"reference_audio\"; filename=\"reference.wav\"\r\nContent-Type: audio/wav\r\n\r\nRIFFfake-audio\r\n"
+            f"--{boundary}--\r\n"
+        ).encode()
+        request = Request(self.base + "/generate", data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+        with self.assertRaises(HTTPError) as error:
+            urlopen(request, timeout=2)
+        self.assertEqual(error.exception.code, 503)
+        result = json.loads(error.exception.read().decode("utf-8"))
+        self.assertIn("ACE-Step", result["message"])
+
+    @patch("server.probe_ace_step", return_value={"available": False, "url": "http://127.0.0.1:8001", "message": "ACE-Step not detected"})
     def test_generate_returns_clear_error_when_provider_missing(self, _probe):
         body = json.dumps({"prompt": "warm organic Afro House"}).encode("utf-8")
         request = Request(self.base + "/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
