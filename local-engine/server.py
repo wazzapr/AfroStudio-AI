@@ -200,38 +200,65 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"status": "error", "message": "Unknown endpoint. Try /health or /status."})
 
     def do_POST(self):
-        if self.path != "/generate":
-            self._send_json(404, {"status": "error", "message": "Unknown endpoint. Use POST /generate."})
+        if self.path != '/generate':
+            self._send_json(404, {'status': 'error', 'message': 'Unknown endpoint. Use POST /generate.'})
             return
         try:
-            length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0 or length > 20000:
-                self._send_json(400, {"status": "error", "message": "Request must contain a small JSON body."})
+            length = int(self.headers.get('Content-Length', '0'))
+            if length <= 0 or length > MAX_REFERENCE_BYTES + 20000:
+                self._send_json(400, {'status': 'error', 'message': 'Request is empty or exceeds the 25 MB reference-audio limit.'})
                 return
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            raw_body = self.rfile.read(length)
+            content_type = self.headers.get('Content-Type', '')
+            reference_bytes = None
+            reference_name = 'reference.wav'
+            reference_type = 'audio/wav'
+            if content_type.lower().startswith('multipart/form-data'):
+                message = BytesParser(policy=default).parsebytes(('MIME-Version: 1.0\r\nContent-Type: ' + content_type + '\r\n\r\n').encode('utf-8') + raw_body)
+                payload = {}
+                if message.is_multipart():
+                    for part in message.iter_parts():
+                        name = part.get_param('name', header='content-disposition')
+                        if not name:
+                            continue
+                        value = part.get_payload(decode=True) or b''
+                        filename = part.get_filename()
+                        if filename and name in ('reference_audio', 'src_audio'):
+                            if len(value) > MAX_REFERENCE_BYTES:
+                                self._send_json(413, {'status': 'error', 'message': 'Reference audio exceeds the 25 MB limit.'})
+                                return
+                            reference_bytes = value
+                            reference_name = os.path.basename(filename)
+                            reference_type = part.get_content_type() or 'application/octet-stream'
+                        elif not filename:
+                            payload[name] = value.decode('utf-8', errors='replace')
+            else:
+                payload = json.loads(raw_body.decode('utf-8'))
             if not isinstance(payload, dict):
-                raise ValueError("Request body must be a JSON object.")
-            prompt = payload.get("prompt", "")
+                raise ValueError('Request body must be a JSON object.')
+            prompt = payload.get('prompt', '')
             if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_PROMPT_LENGTH:
-                self._send_json(400, {"status": "error", "message": "Prompt must contain 1–2000 characters."})
+                self._send_json(400, {'status': 'error', 'message': 'Prompt must contain 1–2000 characters.'})
                 return
             try:
-                bpm = max(30, min(300, int(payload.get("bpm", 122))))
-                duration = max(10, min(180, int(payload.get("duration", 30))))
+                bpm = max(30, min(300, int(payload.get('bpm', 122))))
+                duration = max(10, min(180, int(payload.get('duration', 30))))
+                style_influence = max(0.0, min(1.0, float(payload.get('style_influence', 0.55))))
             except (TypeError, ValueError):
-                self._send_json(400, {"status": "error", "message": "BPM and duration must be numbers."})
+                self._send_json(400, {'status': 'error', 'message': 'BPM, duration, and style influence must be numbers.'})
                 return
             provider = probe_ace_step()
-            if not provider["available"]:
-                self._send_json(503, {"status": "error", "message": provider["message"], "provider_url": ACESTEP_API_URL})
+            if not provider['available']:
+                self._send_json(503, {'status': 'error', 'message': provider['message'], 'provider_url': ACESTEP_API_URL})
                 return
             task_id = str(uuid.uuid4())
             with TASKS_LOCK:
-                TASKS[task_id] = {"status": "queued", "message": "Waiting for ACE-Step…", "audio": None}
-            threading.Thread(target=generation_worker, args=(task_id, prompt.strip(), bpm, duration), daemon=True).start()
-            self._send_json(202, {"task_id": task_id, "status": "queued", "message": "Generation task accepted."})
+                TASKS[task_id] = {'status': 'queued', 'message': 'Waiting for ACE-Step…', 'audio': None}
+            args = (task_id, prompt.strip(), bpm, duration, reference_bytes, reference_name, reference_type, style_influence)
+            threading.Thread(target=generation_worker, args=args, daemon=True).start()
+            self._send_json(202, {'task_id': task_id, 'status': 'queued', 'message': 'Generation task accepted.', 'reference_used': bool(reference_bytes)})
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-            self._send_json(400, {"status": "error", "message": str(error)})
+            self._send_json(400, {'status': 'error', 'message': str(error)})
         except (BrokenPipeError, ConnectionResetError):
             return
 
