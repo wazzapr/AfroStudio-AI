@@ -27,6 +27,19 @@ The app is still a Vite web app; a packaged Windows installer is not available y
 - VST3/plugin hosting, sample library management, automation, and a low-latency desktop audio engine remain future milestones.
 - The app is currently a Vite web app. Desktop packaging and a guided installer remain future milestones.
 
+## Try it on Windows
+
+A packaged `.exe` installer is **not available yet**. To try the latest source on Windows:
+
+1. Download the [latest project ZIP](https://github.com/wazzapr/AfroStudio-AI/archive/refs/heads/feat/studio-foundation.zip).
+2. Extract the ZIP to a normal folder, for example `Desktop\AfroStudio-AI`.
+3. Make sure Node.js LTS is installed from [nodejs.org](https://nodejs.org/).
+4. Open the extracted folder and double-click `START-AFROSTUDIO-WINDOWS.bat`.
+5. On first launch, the script runs `npm install`, which needs an internet connection. When the app starts, it opens `http://127.0.0.1:5173` in your browser.
+6. Keep the black command window open while using the app. Press `Ctrl+C` there to stop it.
+
+If Windows SmartScreen warns about a script downloaded from the internet, only run it if you downloaded the ZIP from this official repository and are comfortable reviewing the script first. The launcher runs project dependency installation and starts the local Vite development server; it is **not** a standalone installer and does not install the AI music model.
+
 ## Development
 
-The initial stack is React, TypeScript, and Vite. Run \`npm install\`, then \`npm run dev\`; run \`npm run build\` for the TypeScript and production build check.
+The initial stack is React, TypeScript, and Vite. Run `npm install`, then `npm run dev`; run `npm run build` for the TypeScript and production build check.
