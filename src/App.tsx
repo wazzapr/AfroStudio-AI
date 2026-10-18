@@ -860,7 +860,6 @@ export default function App() {
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
-            if (typeof data.generationDuration === 'number' && Number.isFinite(data.generationDuration)) setGenerationDuration(Math.max(10, Math.min(180, Math.round(data.generationDuration / 10) * 10)))
       if (typeof data.grooveAmount === 'number' && Number.isFinite(data.grooveAmount)) setGrooveAmount(Math.max(0, Math.min(100, data.grooveAmount)))
       if (typeof data.styleInfluence === 'number' && Number.isFinite(data.styleInfluence)) setStyleInfluence(Math.max(0, Math.min(100, data.styleInfluence)))
       if (typeof data.originalityAmount === 'number' && Number.isFinite(data.originalityAmount)) setOriginalityAmount(Math.max(0, Math.min(100, data.originalityAmount)))
