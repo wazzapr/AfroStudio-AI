@@ -135,8 +135,24 @@ export default function App() {
     notify('Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.')
   }
   const duplicatePattern = () => {
-    setClips(old => [...old, ...old.filter(c => c.lane !== 2).map(c => ({ ...c, id: Date.now() + c.id, name: c.name + ' copy', startBar: Math.min(7, (c.startBar ?? 0) + 1) }))])
-    notify('Pattern clips duplicated.')
+    const selected = clips.find(clip => clip.id === selectedClipId)
+    if (selected) {
+      const startBar = selected.startBar ?? 0
+      const nextBar = startBar + Math.max(1, Math.ceil(selected.duration))
+      if (nextBar >= 16) { notify('There is no room to duplicate this clip later in the 16-bar timeline.'); return }
+      const copy = { ...selected, id: Date.now(), name: selected.name + ' copy', startBar: nextBar, duration: Math.min(selected.duration, 16 - nextBar) }
+      setClips(old => [...old, copy])
+      setSelectedClipId(copy.id)
+      notify('Selected clip duplicated at bar ' + (nextBar + 1) + '.')
+      return
+    }
+    const copies = clips.filter(clip => clip.lane !== 2 && (clip.startBar ?? 0) < 8).map(clip => {
+      const startBar = (clip.startBar ?? 0) + 8
+      return { ...clip, id: Date.now() + clip.id, name: clip.name + ' copy', startBar, duration: Math.min(clip.duration, 16 - startBar) }
+    }).filter(clip => clip.duration > 0)
+    if (!copies.length) { notify('Select a clip to duplicate it later in the arrangement.'); return }
+    setClips(old => [...old, ...copies])
+    notify('Clips duplicated into the second half of the arrangement.')
   }
   const connectProcessedOutput = (ctx: AudioContext, input: AudioNode) => {
     const effects = playbackStateRef.current.enabledEffects
@@ -292,6 +308,7 @@ export default function App() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); duplicatePattern(); return }
+      if (!typing && view === 'Playlist' && selectedClipId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setClips(old => old.filter(clip => clip.id !== selectedClipId)); setSelectedClipId(null); notify('Selected clip deleted.'); return }
       if (!typing && view === 'Piano Roll' && selectedNoteId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setNotes(old => old.filter(note => note.id !== selectedNoteId)); setSelectedNoteId(null); return }
       if (event.code === 'Space' && !typing) { event.preventDefault(); setPlaying(v => !v); return }
       if (!typing && event.key === 'F5') { event.preventDefault(); setView('Playlist') }
