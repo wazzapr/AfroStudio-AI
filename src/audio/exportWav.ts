@@ -3,6 +3,9 @@ export type ExportNote = { id: number; step: number; pitch: number; duration?: n
 type ExportClip = { lane: number; duration: number; startBar?: number }
 
 type ExportOptions = {
+  drumSamples?: (AudioBuffer | null)[]
+  drumSampleIds?: string[]
+  rowSampleIds?: string[]
   bpm: number
   master: number
   steps: boolean[][]
@@ -15,10 +18,17 @@ type ExportOptions = {
   mutedChannels?: boolean[]
 }
 
-function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number, channelLevel: number) {
+function addDrum(ctx: OfflineAudioContext, time: number, row: number, master: number, channelLevel: number, sample?: AudioBuffer | null) {
   const out = ctx.createGain()
   out.gain.value = Math.max(0, Math.min(1, master / 100)) * Math.max(0, Math.min(1, channelLevel / 100)) * 0.8
   out.connect(ctx.destination)
+  if (sample) {
+    const source = ctx.createBufferSource()
+    source.buffer = sample
+    source.connect(out)
+    source.start(time)
+    return
+  }
 
   if (row === 0 || row === 3) {
     const osc = ctx.createOscillator()
@@ -129,7 +139,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([output], { type: 'audio/wav' })
 }
 
-export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, bars = 8, selectedInstrument = 'Soft Keys', mutedChannels = [] }: ExportOptions): Promise<void> {
+export async function exportArrangementWav({ bpm, master, steps, notes, clips, channelLevels = [78, 66, 72, 55, 60], referenceAudio, drumSamples = [], drumSampleIds = [], rowSampleIds = [], bars = 8, selectedInstrument = 'Soft Keys', mutedChannels = [] }: ExportOptions): Promise<void> {
   const safeBpm = Math.max(40, Math.min(240, bpm))
   const safeBars = Math.max(1, Math.min(16, Math.floor(bars)))
   const secondsPerStep = 60 / safeBpm / 4
@@ -166,7 +176,7 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
     const bar = Math.floor(step / 16)
     if (activeAt(0, bar)) {
       steps.forEach((row, rowIndex) => {
-        if (row[patternStep] && !mutedChannels[rowIndex === 0 ? 1 : 2]) addDrum(ctx, time, rowIndex, effectiveMaster, channelLevels[rowIndex === 0 ? 0 : 1] ?? 100)
+        if (row[patternStep] && !mutedChannels[rowIndex === 0 ? 1 : 2]) { const sampleIndex = drumSampleIds.indexOf(rowSampleIds[rowIndex] ?? ''); addDrum(ctx, time, rowIndex, effectiveMaster, channelLevels[rowIndex === 0 ? 0 : 1] ?? 100, sampleIndex >= 0 ? drumSamples[sampleIndex] : undefined) }
       })
     }
     if (activeAt(1, bar) && [0, 6, 8, 14].includes(patternStep)) {
