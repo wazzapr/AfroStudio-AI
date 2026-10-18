@@ -107,6 +107,9 @@ export default function App() {
             setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
             setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture'].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Soft Keys')
             if (typeof data.prompt === 'string') setPrompt(data.prompt)
+            if (typeof data.grooveAmount === 'number' && Number.isFinite(data.grooveAmount)) setGrooveAmount(Math.max(0, Math.min(100, data.grooveAmount)))
+            if (typeof data.styleInfluence === 'number' && Number.isFinite(data.styleInfluence)) setStyleInfluence(Math.max(0, Math.min(100, data.styleInfluence)))
+            if (typeof data.originalityAmount === 'number' && Number.isFinite(data.originalityAmount)) setOriginalityAmount(Math.max(0, Math.min(100, data.originalityAmount)))
             if (Array.isArray(data.generationElements) && data.generationElements.every(value => ['Drums','Bass','Melody','Chords','Atmosphere'].includes(String(value)))) setGenerationElements(data.generationElements as string[])
             if (Array.isArray(data.rowSampleIds) && data.rowSampleIds.length === 4 && data.rowSampleIds.every(id => typeof id === 'string')) setRowSampleIds(data.rowSampleIds as string[])
           }
