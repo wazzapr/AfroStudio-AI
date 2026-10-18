@@ -383,9 +383,9 @@ export default function App() {
       const target = event.target as HTMLElement | null
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveProject(); return }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); duplicatePattern(); return }
+      if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return }
+      if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return }
+      if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); duplicatePattern(); return }
       if (!typing && view === 'Playlist' && selectedClipId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setClips(old => old.filter(clip => clip.id !== selectedClipId)); setSelectedClipId(null); notify('Selected clip deleted.'); return }
       if (!typing && view === 'Piano Roll' && selectedNoteId !== null && (event.key === 'Delete' || event.key === 'Backspace')) { event.preventDefault(); setNotes(old => old.filter(note => note.id !== selectedNoteId)); setSelectedNoteId(null); return }
       if (event.code === 'Space' && !typing) { event.preventDefault(); setPlaying(v => !v); return }
