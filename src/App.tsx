@@ -598,7 +598,7 @@ export default function App() {
   }
   const saveProject = () => {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, prompt, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click(); URL.revokeObjectURL(url)
     notify('Project data exported.')
@@ -640,7 +640,7 @@ export default function App() {
       setNotes((data.notes as {id:number;step:number;pitch:number;duration?:number;velocity?:number}[]).map(note => ({...note,duration:note.duration ?? 2,velocity:note.velocity ?? 100})))
       setSelectedNoteId(null)
       setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture'].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Soft Keys')
-      setMutedChannels([false,false,false,false,false,false])
+      setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
       setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
