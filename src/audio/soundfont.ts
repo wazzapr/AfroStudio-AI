@@ -49,6 +49,7 @@ const playerScripts = new Map<string, Promise<void>>()
 const players = new WeakMap<AudioContext, WebAudioFontPlayerInstance>()
 const loadedPresets = new WeakMap<AudioContext, Map<number, Promise<WebAudioFontPreset>>>()
 const readyPresets = new WeakMap<AudioContext, Set<number>>()
+const presetData = new WeakMap<AudioContext, Map<number, WebAudioFontPreset>>()
 
 function loadScript(url: string): Promise<void> {
   const existing = playerScripts.get(url)
@@ -113,6 +114,9 @@ export async function loadSoundFontInstrument(
     let ready = readyPresets.get(context)
     if (!ready) { ready = new Set(); readyPresets.set(context, ready) }
     ready.add(instrument.program)
+    let data = presetData.get(context)
+    if (!data) { data = new Map(); presetData.set(context, data) }
+    data.set(instrument.program, preset)
     return preset
   })()
   contextPresets.set(instrument.program, promise)
@@ -127,6 +131,22 @@ export async function loadSoundFontInstrument(
 export function isSoundFontInstrumentReady(context: AudioContext, instrumentName: string): boolean {
   const instrument = SOUND_FONT_INSTRUMENTS.find(item => item.name === instrumentName)
   return Boolean(instrument && readyPresets.get(context)?.has(instrument.program))
+}
+
+export function queueSoundFontNote(
+  context: AudioContext,
+  instrumentName: string,
+  destination: AudioNode,
+  pitch: number,
+  duration: number,
+  volume: number,
+  when: number,
+): void {
+  const instrument = SOUND_FONT_INSTRUMENTS.find(item => item.name === instrumentName)
+  const player = players.get(context)
+  const preset = instrument ? presetData.get(context)?.get(instrument.program) : undefined
+  if (!instrument || !player || !preset) throw new Error('The selected sampled instrument is not loaded yet.')
+  player.queueWaveTable(context, destination, preset, Math.max(context.currentTime, when), Math.max(0, Math.min(127, Math.round(pitch))), Math.max(0.05, Math.min(8, duration)), Math.max(0, Math.min(1, volume)))
 }
 
 export async function playSoundFontNote(
