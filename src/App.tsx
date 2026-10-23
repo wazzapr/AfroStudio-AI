@@ -89,6 +89,8 @@ export default function App() {
   const [audioUrl, setAudioUrl] = useState('')
   const [playheadStep, setPlayheadStep] = useState(0)
   const audioElement = useRef<HTMLAudioElement | null>(null)
+  const referenceAudioSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const referenceEffectNodesRef = useRef<AudioNode[]>([])
   const audioImportRequestRef = useRef(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   const [sampleStorageReady, setSampleStorageReady] = useState(false)
@@ -217,6 +219,80 @@ export default function App() {
       setReferencePreviewing(false)
     }
   }, [playing, referencePreviewing])
+  useEffect(() => {
+    const audio = audioElement.current
+    if (!audio || !audioUrl) return
+    const Ctx = window.AudioContext
+    const ctx = audioContextRef.current || audioContext || new Ctx()
+    if (!audioContextRef.current) audioContextRef.current = ctx
+    if (!audioContext) setAudioContext(ctx)
+    let source = referenceAudioSourceRef.current
+    try {
+      if (!source) {
+        source = ctx.createMediaElementSource(audio)
+        referenceAudioSourceRef.current = source
+      }
+      source.disconnect()
+      for (const node of referenceEffectNodesRef.current) {
+        try { if (node instanceof OscillatorNode) node.stop() } catch { /* Oscillator may already have stopped. */ }
+        try { node.disconnect() } catch { /* Node may already be disconnected. */ }
+      }
+      const nodes: AudioNode[] = []
+      let dry: AudioNode = source
+      const addSerial = (node: AudioNode) => { dry.connect(node); nodes.push(node); dry = node }
+      if (enabledEffects[0]) {
+        const filter = ctx.createBiquadFilter()
+        filter.type = 'highpass'; filter.frequency.value = 70; filter.Q.value = 0.7
+        addSerial(filter)
+      }
+      if (enabledEffects[1]) {
+        const compressor = ctx.createDynamicsCompressor()
+        compressor.threshold.value = -20; compressor.knee.value = 16; compressor.ratio.value = 2.8
+        compressor.attack.value = 0.008; compressor.release.value = 0.2
+        addSerial(compressor)
+      }
+      dry.connect(ctx.destination)
+      const addEcho = (seconds: number, feedbackAmount: number, wetAmount: number) => {
+        const delay = ctx.createDelay(1.2), feedback = ctx.createGain(), wet = ctx.createGain()
+        delay.delayTime.value = seconds; feedback.gain.value = feedbackAmount; wet.gain.value = wetAmount
+        dry.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
+        nodes.push(delay, feedback, wet)
+      }
+      if (enabledEffects[2]) addEcho(0.045, 0.18, 0.16)
+      if (enabledEffects[3]) addEcho(60 / bpm / 2, 0.24, 0.2)
+      if (enabledEffects[4]) {
+        const length = Math.max(1, Math.floor(ctx.sampleRate * 1.6))
+        const impulse = ctx.createBuffer(2, length, ctx.sampleRate)
+        for (let channel = 0; channel < 2; channel++) {
+          const data = impulse.getChannelData(channel)
+          for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.8)
+        }
+        const convolver = ctx.createConvolver(), wet = ctx.createGain()
+        convolver.buffer = impulse; wet.gain.value = 0.22
+        dry.connect(convolver); convolver.connect(wet).connect(ctx.destination)
+        nodes.push(convolver, wet)
+      }
+      if (enabledEffects[5]) {
+        const delay = ctx.createDelay(0.06), lfo = ctx.createOscillator(), depth = ctx.createGain(), wet = ctx.createGain()
+        delay.delayTime.value = 0.025; lfo.frequency.value = 0.65; depth.gain.value = 0.007; wet.gain.value = 0.18
+        lfo.connect(depth).connect(delay.delayTime); dry.connect(delay); delay.connect(wet).connect(ctx.destination); lfo.start()
+        nodes.push(delay, lfo, depth, wet)
+      }
+      referenceEffectNodesRef.current = nodes
+      if (ctx.state === 'suspended') void ctx.resume()
+    } catch {
+      // Keep the imported file usable even if the browser cannot create a media-element audio route.
+      try { audioElement.current?.load() } catch { /* Browser fallback only. */ }
+    }
+    return () => {
+      try { source?.disconnect() } catch { /* Ignore already-disconnected nodes. */ }
+      for (const node of referenceEffectNodesRef.current) {
+        try { if (node instanceof OscillatorNode) node.stop() } catch { /* Oscillator may already have stopped. */ }
+        try { node.disconnect() } catch { /* Ignore already-disconnected nodes. */ }
+      }
+      referenceEffectNodesRef.current = []
+    }
+  }, [audioUrl, audioContext, enabledEffects, bpm])
   useEffect(() => {
     const move = (event: PointerEvent) => {
       const drag = clipResizeRef.current
@@ -878,6 +954,15 @@ export default function App() {
       if (requestId === audioImportRequestRef.current) setAnalyzingReference(false)
     }
   }
+  const resetReferenceAudioRouting = () => {
+    try { referenceAudioSourceRef.current?.disconnect() } catch { /* Old source may already be disconnected. */ }
+    referenceAudioSourceRef.current = null
+    for (const node of referenceEffectNodesRef.current) {
+      try { if (node instanceof OscillatorNode) node.stop() } catch { /* Oscillator may already have stopped. */ }
+      try { node.disconnect() } catch { /* Ignore already-disconnected nodes. */ }
+    }
+    referenceEffectNodesRef.current = []
+  }
   const importFile = (file?: File, startBar = 0) => {
     if (!file) return
     if (!file.type.startsWith('audio/') && !/\.(mp3|wav|flac|ogg|m4a|aiff?)$/i.test(file.name)) { notify('Choose an audio file such as WAV, MP3, FLAC or M4A.'); return }
@@ -895,6 +980,7 @@ export default function App() {
       const duration = Number.isFinite(audio.duration) ? audio.duration : 30
       setReferenceName(file.name)
       setReferenceFile(file)
+      resetReferenceAudioRouting()
       setAudioUrl(url); audioElement.current = audio
       audio.onended = () => setReferencePreviewing(false)
       const barDuration = 4 * 60 / bpm; const clipStart = Math.max(0, Math.min(15, Math.floor(startBar))); const clipBars = Math.max(1, Math.min(16 - clipStart, Math.ceil(duration / barDuration))); setClips(old => [...old.filter(c => !(c.lane === 2 && c.name === 'Reference · drop a song')), { id: Date.now(), name: file.name, duration: clipBars, color: colors[2], lane: 2, startBar: clipStart }])
@@ -907,7 +993,7 @@ export default function App() {
     }
     audio.onerror = () => {
       if (requestId !== audioImportRequestRef.current) { discardStaleImport(); return }
-      setReferenceName(file.name); setReferenceFile(file); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio
+      setReferenceName(file.name); setReferenceFile(file); resetReferenceAudioRouting(); setAnalysis(['File selected: ' + file.name, 'Could not read duration in the browser.']); setAudioUrl(url); audioElement.current = audio
       audio.onended = () => setReferencePreviewing(false)
     }
     audio.load()
@@ -915,6 +1001,7 @@ export default function App() {
   const clearReference = () => {
     audioImportRequestRef.current += 1
     audioElement.current?.pause()
+    resetReferenceAudioRouting()
     audioElement.current = null
     setReferencePreviewing(false)
     setReferenceName('')
@@ -1123,7 +1210,7 @@ export default function App() {
         {view==='Channel Rack'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Drum size={16}/></div><div><h2>Channel Rack</h2><p>Build a 16-step groove · click a step to toggle it</p></div></div><button className="secondary-button compact" onClick={()=>setSteps(rows=>rows.map((_,r)=>Array.from({length:16},(_,i)=>r===0?i%4===0:r===1?i===4||i===12:r===2?i%2===0:i%4===3)))}>Reset pattern</button></div><div className="step-grid"><div className="step-header"><span>CHANNEL</span>{Array.from({length:16},(_,i)=><span key={i} className={i%4===0?'beat-start':''}>{i+1}</span>)}</div>{drumNames.map((name,r)=><div className="step-row" key={name}><button className="channel-name" onClick={()=>{const assigned=drumSamples.find(sample=>sample.id===rowSampleIds[r]);if(assigned)void previewDrumSample(assigned);else void preview([65,180,800,230][r])}}><i style={{background:colors[r]}}/><span>{name}</span><Play size={12}/></button>{steps[r].map((on,i)=><button key={i} aria-label={name+' step '+(i+1)} className={'step '+(on?'on on-'+r:'')+' '+(i%4===0?'beat-start':'')} onClick={()=>setSteps(old=>old.map((row,j)=>j!==r?row:row.map((v,k)=>k===i?!v:v)))}/>)}</div>)}</div><div className="rack-footer"><span>{steps.reduce((n,row)=>n+row.filter(Boolean).length,0)} active steps</span><button className="primary-button" onClick={()=>{setView('Playlist');notify('Pattern ready to arrange.')}}><Plus size={15}/> Add pattern to Playlist</button></div></section>}
         {view==='Piano Roll'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><Music2 size={16}/></div><div><h2>Piano Roll</h2><p>Click to add notes, select notes to edit length and velocity · A minor</p></div></div><div className="piano-edit-controls"><label>Length <select aria-label="Selected note length" disabled={!selectedNote} value={selectedNote?.duration ?? 2} onChange={e=>{const duration=Number(e.target.value);if(selectedNote)setNotes(old=>old.map(note=>note.id===selectedNote.id?{...note,duration}:note))}}>{[1,2,3,4,6,8,12,16].map(length=><option key={length} value={length}>{length} step{length===1?'':'s'}</option>)}</select></label><label>Velocity <input aria-label="Selected note velocity" type="range" min="1" max="127" disabled={!selectedNote} value={selectedNote?.velocity ?? 100} onChange={e=>{const velocity=Number(e.target.value);if(selectedNote)setNotes(old=>old.map(note=>note.id===selectedNote.id?{...note,velocity}:note))}}/><span>{selectedNote?.velocity ?? '—'}</span></label><button className="secondary-button compact" disabled={!selectedNote} onClick={()=>{setNotes(old=>old.filter(note=>note.id!==selectedNoteId));setSelectedNoteId(null)}}><Trash2 size={13}/> Delete note</button><button className="secondary-button compact" onClick={()=>{setNotes([]);setSelectedNoteId(null)}}>Clear notes</button><button className="secondary-button compact" onClick={()=>{exportPianoRollMidi(notes,bpm);notify(`Exported ${notes.length} MIDI notes.`)}}><Download size={13}/> Export MIDI</button></div></div><div className="piano-grid-wrap"><div className="piano-keys">{['B4','A♯4','A4','G♯4','G4','F♯4','F4','E4','D♯4','D4','C♯4','C4'].map((key,i)=><div key={key} className={key.includes('♯')?'black-key':'white-key'}>{key}</div>)}</div><div className="piano-grid" onPointerDown={handlePianoPointerDown} onPointerMove={handlePianoPointerMove} onPointerUp={handlePianoPointerUp} onPointerCancel={handlePianoPointerUp}>{Array.from({length:12},(_,row)=><div className={'piano-row '+([2,4,7,11].includes(row)?'root-row':'')} key={row}>{Array.from({length:16},(_,col)=><button key={col} className={'piano-cell '+(col%4===0?'bar-cell':'')} onClick={()=>{const pitch=11-row;const found=notes.some(n=>n.step===col&&n.pitch===pitch);if(found){const note=notes.find(n=>n.step===col&&n.pitch===pitch);setSelectedNoteId(note?.id ?? null)}else{const id=Date.now();setNotes(old=>[...old,{id,step:col,pitch,duration:2,velocity:100}]);setSelectedNoteId(id)}}}/>)}{notes.filter(n=>n.pitch===11-row).map(n=><button key={n.id} data-note-id={n.id} className={'midi-note '+(selectedNoteId===n.id?'selected':'')} style={{left:(n.step/16*100)+'%',width:(Math.min(16-n.step,n.duration)/16*100)+'%',opacity:0.45+0.55*n.velocity/127}} onClick={()=>setSelectedNoteId(n.id)} title={'Drag to move · drag the right edge to resize · '+n.duration+' steps · velocity '+n.velocity}/>)}</div>)}</div></div><div className="piano-footer"><span>{notes.length} notes</span><span>Snap: 1/4 beat</span><span>Velocity <span className="velocity-bars">{notes.map(n=><i key={n.id} style={{height:(30+(n.pitch*7)%65)+'%'}}/>)}</span></span></div></section>}
         {view==='Mixer'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Mixer</h2><p>Channel levels · mute and gain controls</p></div></div><button className="secondary-button compact" onClick={()=>{setMaster(78);setChannelLevels([78,66,72,55,60]);setMutedChannels([false,false,false,false,false,false])}}>Reset levels</button></div><div className="mixer-channels">{['Master','Kick','Percussion','Bass','Atmosphere','Reference'].map((name,i)=><div className="mixer-channel" key={name}><span className="mixer-number">0{i+1}</span><strong>{name}</strong><div className="meter"><i style={{height:[74,62,48,68,37,53][i]+'%'}}/><i style={{height:[63,53,41,57,29,44][i]+'%'}}/></div><input aria-label={name+' volume'} type="range" min="0" max="100" value={i===0?master:channelLevels[i-1]} onChange={e=>{const value=Number(e.target.value);if(i===0)setMaster(value);else setChannelLevels(old=>old.map((v,j)=>j===i-1?value:v))}}/><span className="db-value">{(20*Math.log10(Math.max(0.001,(i===0?master:channelLevels[i-1])/100))).toFixed(1)} dB</span><button onClick={()=>setMutedChannels(old=>old.map((muted,j)=>j===i?!muted:muted))} className={mutedChannels[i]?'mute-button muted':'mute-button'} aria-pressed={mutedChannels[i]} title={mutedChannels[i]?'Unmute '+name:'Mute '+name}>M</button></div>)}</div><p className="mixer-note"><Volume2 size={14}/> Levels and mute controls affect playback. Separate per-channel effect routing and live signal meters are still planned.</p></section>}
-        {view==='Reference Track'&&<section className="panel reference-panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><WandSparkles size={16}/></div><div><h2>AI Reference Track</h2><p>Use musical characteristics as inspiration for something original</p></div></div><b className="beta-tag large">EARLY ACCESS</b></div><div className="reference-drop" onClick={()=>fileInput.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();e.stopPropagation();importFile(e.dataTransfer.files?.[0])}}><div className="upload-orb"><FileAudio size={25}/></div><h3>{referenceName||'Drop a reference track here'}</h3><p>{referenceName?'Reference loaded. You can replace it with another audio file.':'Drag and drop an audio file, or browse your computer'}</p><span className="file-types">WAV · MP3 · FLAC · M4A</span><button className="secondary-button" onClick={e=>{e.stopPropagation();fileInput.current?.click()}}><Upload size={15}/> Choose audio file</button><button className="secondary-button" disabled={!audioUrl||playing} onClick={e=>{e.stopPropagation();const audio=audioElement.current;if(!audio)return;if(referencePreviewing){audio.pause();setReferencePreviewing(false)}else{audio.currentTime=0;void audio.play().then(()=>setReferencePreviewing(true)).catch(()=>notify('Could not preview this audio format in the browser.'))}}}>{referencePreviewing?<Pause size={15}/>:<Play size={15}/>} {referencePreviewing?'Pause preview':'Preview audio'}</button>{audioUrl&&<button className="secondary-button compact" onClick={e=>{e.stopPropagation();clearReference()}}><Trash2 size={14}/> Remove audio</button>}</div>{(analysis.length>0||analyzingReference)&&<div className="analysis-results"><h3><FileAudio size={16}/> Reference analysis</h3>{analyzingReference&&<div><Waves size={14}/> Analysing audio locally on this PC…</div>}{analysis.map(item=><div key={item}><Check size={14}/>{item}</div>)}{detectedBpm&&<button className="secondary-button compact" onClick={()=>{setBpm(detectedBpm);notify('Project tempo set to estimated '+detectedBpm+' BPM.')}}>Use {detectedBpm} BPM in project</button>}</div>}<div className="reference-options"><div className="section-subhead"><div><h3>Shape the direction</h3><p>Choose what matters in your new track</p></div><span className="local-tag"><i className="status-dot green"/> LOCAL-FIRST DESIGN</span></div><label className="prompt-label" htmlFor="ref-prompt">Describe the sound you're aiming for</label><textarea id="ref-prompt" value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3}/><div className="reference-controls">{[{name:'Groove',value:grooveAmount,onChange:setGrooveAmount},{name:'Style',value:styleInfluence,onChange:setStyleInfluence},{name:'Originality',value:originalityAmount,onChange:setOriginalityAmount}].map(({name,value,onChange})=><label className="range-control" key={name}><span>{name}<strong>{value}%</strong></span><input aria-label={name} type="range" value={value} onChange={e=>onChange(Number(e.target.value))} min="0" max="100"/></label>)}</div><div className="local-ai-connection"><div className="local-ai-title"><div><strong>Local AI engine</strong><p>Optional connection · no paid API</p></div><span className={'ai-connection-status '+localAiStatus}><i className="status-dot"/>{localAiStatus==='online'?'CONNECTED':localAiStatus==='checking'?'CHECKING':localAiStatus==='offline'?'NOT CONNECTED':'NOT SET UP'}</span></div><div className="local-ai-connect-row"><input aria-label="Local AI engine URL" value={localAiUrl} onChange={e=>{setLocalAiUrl(e.target.value);setLocalAiStatus('unchecked');setLocalAiMessage('Connection has not been checked.')}} placeholder="http://127.0.0.1:7860"/><button className="secondary-button compact" onClick={()=>void checkLocalAiEngine()} disabled={localAiStatus==='checking'}>{localAiStatus==='checking'?'Checking…':'Check connection'}</button></div><p className="local-ai-message">{localAiMessage}</p><p className="local-ai-note">ACE-Step integration uses a local API only. Your GTX 750 Ti has 2 GB VRAM, below the recommended 4 GB; generation may fail or be very slow. Choose a 30–180 second render below. Longer renders may be very slow on this PC.</p><label className="duration-control">Audio length <select aria-label="AI audio length" value={generationDuration} onChange={e=>setGenerationDuration(Number(e.target.value))} disabled={aiAudioGenerating}>{[30,60,90,120,180].map(seconds=><option key={seconds} value={seconds}>{seconds} seconds</option>)}</select></label><button className="primary-button generate-button" onClick={()=>void generateAiAudio()} disabled={!aceStepAvailable||aiAudioGenerating||!prompt.trim()}><Sparkles size={16}/>{aiAudioGenerating?'Generating AI audio…':'Generate real AI audio (ACE-Step)'} <span>{aiAudioGenerating?'…':'→'}</span></button></div><div className="create-options"><span>GENERATE ELEMENTS</span>{['Drums','Bass','Melody','Chords','Atmosphere'].map((item,i)=><button key={item} className={'element-chip '+(generationElements.includes(item)?'chip-active':'')} aria-pressed={generationElements.includes(item)} onClick={()=>setGenerationElements(old=>old.includes(item)?old.filter(v=>v!==item):[...old,item])}><span>{['◉','≋','♫','◇','☼'][i]}</span>{item}</button>)}</div><button className="primary-button generate-button" onClick={generateAfroHouseIdea}><Sparkles size={16}/> Generate starting idea locally <span>→</span></button><p className="disclaimer">The ACE-Step button above generates a short AI audio file when a compatible local model service is available. This separate button creates editable drum steps and MIDI-style notes procedurally; it does not use a paid API or generate full audio.</p></div></section>}
+        {view==='Reference Track'&&<section className="panel reference-panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><WandSparkles size={16}/></div><div><h2>AI Reference Track</h2><p>Use musical characteristics as inspiration for something original</p></div></div><b className="beta-tag large">EARLY ACCESS</b></div><div className="reference-drop" onClick={()=>fileInput.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();e.stopPropagation();importFile(e.dataTransfer.files?.[0])}}><div className="upload-orb"><FileAudio size={25}/></div><h3>{referenceName||'Drop a reference track here'}</h3><p>{referenceName?'Reference loaded. You can replace it with another audio file.':'Drag and drop an audio file, or browse your computer'}</p><span className="file-types">WAV · MP3 · FLAC · M4A</span><button className="secondary-button" onClick={e=>{e.stopPropagation();fileInput.current?.click()}}><Upload size={15}/> Choose audio file</button><button className="secondary-button" disabled={!audioUrl||playing} onClick={e=>{e.stopPropagation();const audio=audioElement.current;if(!audio)return;if(referencePreviewing){audio.pause();setReferencePreviewing(false)}else{audio.currentTime=0;void audioContextRef.current?.resume();void audio.play().then(()=>setReferencePreviewing(true)).catch(()=>notify('Could not preview this audio format in the browser.'))}}}>{referencePreviewing?<Pause size={15}/>:<Play size={15}/>} {referencePreviewing?'Pause preview':'Preview audio'}</button>{audioUrl&&<button className="secondary-button compact" onClick={e=>{e.stopPropagation();clearReference()}}><Trash2 size={14}/> Remove audio</button>}</div>{(analysis.length>0||analyzingReference)&&<div className="analysis-results"><h3><FileAudio size={16}/> Reference analysis</h3>{analyzingReference&&<div><Waves size={14}/> Analysing audio locally on this PC…</div>}{analysis.map(item=><div key={item}><Check size={14}/>{item}</div>)}{detectedBpm&&<button className="secondary-button compact" onClick={()=>{setBpm(detectedBpm);notify('Project tempo set to estimated '+detectedBpm+' BPM.')}}>Use {detectedBpm} BPM in project</button>}</div>}<div className="reference-options"><div className="section-subhead"><div><h3>Shape the direction</h3><p>Choose what matters in your new track</p></div><span className="local-tag"><i className="status-dot green"/> LOCAL-FIRST DESIGN</span></div><label className="prompt-label" htmlFor="ref-prompt">Describe the sound you're aiming for</label><textarea id="ref-prompt" value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3}/><div className="reference-controls">{[{name:'Groove',value:grooveAmount,onChange:setGrooveAmount},{name:'Style',value:styleInfluence,onChange:setStyleInfluence},{name:'Originality',value:originalityAmount,onChange:setOriginalityAmount}].map(({name,value,onChange})=><label className="range-control" key={name}><span>{name}<strong>{value}%</strong></span><input aria-label={name} type="range" value={value} onChange={e=>onChange(Number(e.target.value))} min="0" max="100"/></label>)}</div><div className="local-ai-connection"><div className="local-ai-title"><div><strong>Local AI engine</strong><p>Optional connection · no paid API</p></div><span className={'ai-connection-status '+localAiStatus}><i className="status-dot"/>{localAiStatus==='online'?'CONNECTED':localAiStatus==='checking'?'CHECKING':localAiStatus==='offline'?'NOT CONNECTED':'NOT SET UP'}</span></div><div className="local-ai-connect-row"><input aria-label="Local AI engine URL" value={localAiUrl} onChange={e=>{setLocalAiUrl(e.target.value);setLocalAiStatus('unchecked');setLocalAiMessage('Connection has not been checked.')}} placeholder="http://127.0.0.1:7860"/><button className="secondary-button compact" onClick={()=>void checkLocalAiEngine()} disabled={localAiStatus==='checking'}>{localAiStatus==='checking'?'Checking…':'Check connection'}</button></div><p className="local-ai-message">{localAiMessage}</p><p className="local-ai-note">ACE-Step integration uses a local API only. Your GTX 750 Ti has 2 GB VRAM, below the recommended 4 GB; generation may fail or be very slow. Choose a 30–180 second render below. Longer renders may be very slow on this PC.</p><label className="duration-control">Audio length <select aria-label="AI audio length" value={generationDuration} onChange={e=>setGenerationDuration(Number(e.target.value))} disabled={aiAudioGenerating}>{[30,60,90,120,180].map(seconds=><option key={seconds} value={seconds}>{seconds} seconds</option>)}</select></label><button className="primary-button generate-button" onClick={()=>void generateAiAudio()} disabled={!aceStepAvailable||aiAudioGenerating||!prompt.trim()}><Sparkles size={16}/>{aiAudioGenerating?'Generating AI audio…':'Generate real AI audio (ACE-Step)'} <span>{aiAudioGenerating?'…':'→'}</span></button></div><div className="create-options"><span>GENERATE ELEMENTS</span>{['Drums','Bass','Melody','Chords','Atmosphere'].map((item,i)=><button key={item} className={'element-chip '+(generationElements.includes(item)?'chip-active':'')} aria-pressed={generationElements.includes(item)} onClick={()=>setGenerationElements(old=>old.includes(item)?old.filter(v=>v!==item):[...old,item])}><span>{['◉','≋','♫','◇','☼'][i]}</span>{item}</button>)}</div><button className="primary-button generate-button" onClick={generateAfroHouseIdea}><Sparkles size={16}/> Generate starting idea locally <span>→</span></button><p className="disclaimer">The ACE-Step button above generates a short AI audio file when a compatible local model service is available. This separate button creates editable drum steps and MIDI-style notes procedurally; it does not use a paid API or generate full audio.</p></div></section>}
         {view==='Instruments'&&<section className="panel">
           <div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Disc3 size={16}/></div><div><h2>Instrument Rack</h2><p>Real sampled instruments for the Piano Roll and arrangement</p></div></div><button className="secondary-button compact" onClick={()=>notify('VST3 plugin hosting is planned for a later native audio-engine milestone.')}><Plus size={14}/> Add plugin</button></div>
           <div className="instrument-library-tools"><input className="sample-search" aria-label="Search instruments" placeholder="Search piano, bass, brass, guitar…" value={instrumentSearch} onChange={e=>setInstrumentSearch(e.target.value)}/><select aria-label="Filter instrument category" value={instrumentCategory} onChange={e=>setInstrumentCategory(e.target.value)}><option value="ALL">All categories</option>{Array.from(new Set(SOUND_FONT_INSTRUMENTS.map(item=>item.category))).sort().map(category=><option key={category} value={category}>{category}</option>)}</select><span>{filteredInstruments.length} sampled sounds</span></div>
