@@ -22,6 +22,8 @@ const colors = ['#b4f36a', '#b38cff', '#55c8d8', '#ffb36b']
 
 export default function App() {
   const [view, setView] = useState('Playlist')
+  const [assistantInput, setAssistantInput] = useState('')
+  const [assistantMessages, setAssistantMessages] = useState<{role:'assistant'|'user';text:string}[]>([{role:'assistant',text:'Hi! I can operate the studio with local commands. Try “set BPM to 122”, “load trumpet”, “enable delay”, “make an Afro House idea”, or “open Piano Roll”. This first version uses built-in command rules, not a connected language model.'}])
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'checked' | 'error'>('idle')
   const [latestUpdate, setLatestUpdate] = useState<{sha:string;message:string;date:string;url:string;installerUrl:string|null} | null>(null)
   const [updateCheckMessage, setUpdateCheckMessage] = useState('Check GitHub for the latest AfroStudio-AI changes.')
@@ -413,6 +415,61 @@ export default function App() {
     setView('Playlist')
     const sampleNote = selected.has('Drums') && matchedSampleCount ? ' Matched ' + matchedSampleCount + ' imported drum samples by filename.' : ''
     notify((referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM)' + (referenceGroove ? ' using the rough ' + referenceGroove + ' transient profile.' : '.') + ' This is heuristic pattern generation, not AI audio remixing or stem separation.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.') + sampleNote)
+  }
+  const runStudioCommand = (rawCommand: string) => {
+    const command = rawCommand.trim()
+    if (!command) return
+    setAssistantMessages(old => [...old, { role: 'user', text: command }])
+    const lower = command.toLowerCase()
+    let reply = 'I could not match that command yet. Try setting BPM, loading an instrument, enabling an effect, generating an Afro House idea, adding a clip, or opening a studio page.'
+    const tempoMatch = lower.match(/(?:bpm|tempo)(?:\s+to|\s*=|\s+at)?\s*(\d{2,3})/)
+    if (tempoMatch) {
+      const tempo = Math.max(40, Math.min(240, Number(tempoMatch[1])))
+      setBpm(tempo)
+      reply = 'Done — project tempo set to ' + tempo + ' BPM.'
+    } else if (/\b(make|generate|create)\b.*\b(afro house|groove|starting idea|beat|pattern)\b/.test(lower)) {
+      generateAfroHouseIdea()
+      reply = 'Created an editable local Afro House starting idea. I updated the Channel Rack steps, Piano Roll notes and Playlist clips where selected. This is procedural generation, not a full AI audio remix.'
+    } else if (/\b(enable|turn on|activate)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
+      const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
+      setEnabledEffects(old => old.map((value, index) => index === effectIndex ? true : value))
+      reply = 'Enabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay'][effectIndex] + ' for built-in playback.'
+    } else if (/\b(disable|turn off)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
+      const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
+      setEnabledEffects(old => old.map((value, index) => index === effectIndex ? false : value))
+      reply = 'Disabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay'][effectIndex] + '.'
+    } else if (/\b(add|create)\b.*\b(clip|track|pattern)\b/.test(lower)) {
+      const isBass = /bass/.test(lower)
+      const isMelody = /melody|piano|lead/.test(lower)
+      const lane = isBass ? 1 : isMelody ? 3 : 0
+      const name = isBass ? 'Assistant bass clip' : isMelody ? 'Assistant melody clip' : 'Assistant Afro groove'
+      const clip = { id: Date.now(), name, duration: 8, color: colors[lane], lane, startBar: 0 }
+      setClips(old => [...old, clip])
+      setSelectedClipId(clip.id)
+      setView('Playlist')
+      reply = 'Added "' + name + '" to the Playlist at bar 1. You can move and resize it there.'
+    } else if (/\b(open|show|go to)\b/.test(lower)) {
+      const pages = ['Piano Roll','Channel Rack','Playlist','Sampler','Mixer','Instruments','Effects','Reference Track','Updates']
+      const page = pages.find(item => lower.includes(item.toLowerCase()))
+      if (page) { setView(page); reply = 'Opened ' + page + '.' }
+    } else {
+      const requestedInstrument = SOUND_FONT_INSTRUMENTS.find(item => lower.includes(item.name.toLowerCase()))
+      if (requestedInstrument || /\b(load|select|use)\b.*\b(piano|guitar|bass|trumpet|horn|flute|strings|pad)\b/.test(lower)) {
+        const instrument = requestedInstrument ?? SOUND_FONT_INSTRUMENTS.find(item => lower.includes(item.category.toLowerCase()) || lower.includes(item.name.split(' ')[0].toLowerCase()))
+        if (instrument) {
+          setView('Instruments')
+          void selectInstrument(instrument.name)
+          reply = 'Loading ' + instrument.name + '. Its sampled sound needs an internet connection on first use; once loaded, choose notes in Piano Roll.'
+        }
+      }
+    }
+    setAssistantMessages(old => [...old, { role: 'assistant', text: reply }])
+  }
+  const submitStudioCommand = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const command = assistantInput
+    setAssistantInput('')
+    runStudioCommand(command)
   }
   const duplicatePattern = () => {
     const selected = clips.find(clip => clip.id === selectedClipId)
@@ -1017,11 +1074,18 @@ export default function App() {
     </div>
     <div className="workspace">
       <aside className="sidebar"><div className="sidebar-label">WORKSPACE</div>{nav.map(({name,Icon})=><button key={name} className={view===name?'side-nav active':'side-nav'} onClick={()=>setView(name)}><Icon size={17}/><span>{name}</span>{name==='Playlist'&&<small>F5</small>}</button>)}
-        <div className="sidebar-label plugins-label">TOOLS & AI</div><button className={view==='Reference Track'?'side-nav active':'side-nav'} onClick={()=>setView('Reference Track')}><WandSparkles size={17}/><span>Reference Track</span><b className="beta-tag">AI</b></button><button className={view==='Instruments'?'side-nav active':'side-nav'} onClick={()=>setView('Instruments')}><Disc3 size={17}/><span>Instruments</span></button><button className={view==='Effects'?'side-nav active':'side-nav'} onClick={()=>setView('Effects')}><Waves size={17}/><span>Effects</span></button><button className={view==='Updates'?'side-nav active':'side-nav'} onClick={()=>setView('Updates')}><RefreshCw size={17}/><span>Updates</span><b className="beta-tag">NEW</b></button>
+        <div className="sidebar-label plugins-label">TOOLS & AI</div><button className={view==='Assistant'?'side-nav active':'side-nav'} onClick={()=>setView('Assistant')}><Bot size={17}/><span>Studio Assistant</span><b className="beta-tag">NEW</b></button><button className={view==='Reference Track'?'side-nav active':'side-nav'} onClick={()=>setView('Reference Track')}><WandSparkles size={17}/><span>Reference Track</span><b className="beta-tag">AI</b></button><button className={view==='Instruments'?'side-nav active':'side-nav'} onClick={()=>setView('Instruments')}><Disc3 size={17}/><span>Instruments</span></button><button className={view==='Effects'?'side-nav active':'side-nav'} onClick={()=>setView('Effects')}><Waves size={17}/><span>Effects</span></button><button className={view==='Updates'?'side-nav active':'side-nav'} onClick={()=>setView('Updates')}><RefreshCw size={17}/><span>Updates</span><b className="beta-tag">NEW</b></button>
         <div className="sidebar-bottom"><div className="upgrade-card"><div className="upgrade-icon"><Sparkles size={17}/></div><strong>Your sound. Your rules.</strong><p>Local-first tools. No mandatory subscriptions.</p><button onClick={()=>setView('Reference Track')}>Explore AI tools <span>↗</span></button></div><button className="help-link" onClick={()=>notify('Shortcuts: Space Play/Stop · Ctrl+Z Undo · Ctrl+Shift+Z Redo · Ctrl+S Save · Ctrl+B Duplicate clip · Ctrl+D Duplicate note · F2 Rename selected Playlist clip · Double-click a clip to rename it · Arrow keys move selected Piano Roll note · Shift+Left/Right resize note · Delete selected Piano Roll note · F5 Playlist · F6 Rack · F7 Piano Roll · F9 Mixer')}>? &nbsp; Help & shortcuts</button><div className="version">AFROSTUDIO AI <span>v0.1.0 · EARLY BUILD</span></div></div>
       </aside>
       <main className="main-content">
         <div className="page-heading"><div><div className="eyebrow"><i/> YOUR CREATIVE SPACE</div><h1>{view==='Playlist'?'Arrangement':view}</h1><p>{view==='Reference Track'?'Discover the DNA of a track. Create something that feels like you.':'Build your next Afro House record, one layer at a time.'}</p></div><div className="heading-actions"><button className="small-icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15}/></button><button className="small-icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" onClick={redo}><Redo2 size={15}/></button><button className="secondary-button" onClick={()=>fileInput.current?.click()}><Upload size={15}/> Import audio</button><button className="secondary-button" onClick={async()=>{notify("Rendering Playlist arrangement to WAV…");try{let referenceAudio:AudioBuffer|undefined;if(audioUrl){const response=await fetch(audioUrl);const bytes=await response.arrayBuffer();const decodeContext=new AudioContext();try{referenceAudio=await decodeContext.decodeAudioData(bytes)}finally{await decodeContext.close()}}await exportArrangementWav({bpm,master,steps,notes,clips,channelLevels,referenceAudio,drumSamples:drumSamples.map(sample=>sample.buffer),drumSampleIds:drumSamples.map(sample=>sample.id),rowSampleIds,bars:Math.min(16,Math.max(8,...clips.filter(clip=>clip.lane!==2||Boolean(audioUrl)).map(clip=>Math.ceil((clip.startBar??0)+clip.duration)))),selectedInstrument,mutedChannels});notify("Arrangement WAV exported successfully.")}catch{notify("WAV export failed in this browser.")}}}><Download size={15}/> Export WAV</button><input ref={fileInput} type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden onChange={e=>importFile(e.target.files?.[0])}/><button className="primary-button" onClick={()=>setView('Reference Track')}><Sparkles size={15}/> AI Assistant</button></div></div>
+        {view==='Assistant'&&<section className="panel assistant-panel">
+          <div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><Bot size={16}/></div><div><h2>Studio Assistant</h2><p>Give the studio commands and let it perform supported actions</p></div></div><span className="local-tag"><i className="status-dot green"/> LOCAL COMMANDS</span></div>
+          <div className="assistant-notice"><Sparkles size={17}/><div><strong>Action-based studio control · first milestone</strong><p>This assistant can directly change tempo, load sampled instruments, toggle built-in effects, create clips, generate editable starting patterns, and open studio pages. It is not yet a connected ChatGPT model and does not claim to understand every free-form request.</p></div></div>
+          <div className="assistant-transcript" aria-live="polite">{assistantMessages.map((message,index)=><div key={index} className={'assistant-message '+message.role}><div className="assistant-avatar">{message.role==='assistant'?<Bot size={15}/>:<Music2 size={15}/>}</div><div><span>{message.role==='assistant'?'AFROSTUDIO':'YOU'}</span><p>{message.text}</p></div></div>)}</div>
+          <form className="assistant-compose" onSubmit={submitStudioCommand}><textarea aria-label="Studio command" rows={2} value={assistantInput} onChange={event=>setAssistantInput(event.target.value)} placeholder="Example: Set BPM to 120, load trumpet, enable delay…"/><button className="primary-button" type="submit" disabled={!assistantInput.trim()}><Sparkles size={15}/> Run command</button></form>
+          <div className="assistant-examples"><span>TRY A COMMAND</span>{['Set BPM to 120','Load trumpet','Enable delay','Make an Afro House idea','Add a bass clip','Open Piano Roll'].map(command=><button key={command} className="secondary-button compact" onClick={()=>runStudioCommand(command)}>{command}</button>)}</div>
+        </section>}
         {view==='Updates'&&<section className="panel update-panel">
           <div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><RefreshCw size={16}/></div><div><h2>AfroStudio Updates</h2><p>Check for a newer Windows installer</p></div></div><button className="secondary-button compact" onClick={()=>void checkForUpdates()} disabled={updateCheckState==='checking'}><RefreshCw size={14}/>{updateCheckState==='checking'?'Checking…':'Check for updates'}</button></div>
           <div className="update-content">
