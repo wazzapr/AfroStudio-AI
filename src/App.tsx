@@ -22,7 +22,7 @@ const colors = ['#b4f36a', '#b38cff', '#55c8d8', '#ffb36b']
 export default function App() {
   const [view, setView] = useState('Playlist')
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'checked' | 'error'>('idle')
-  const [latestUpdate, setLatestUpdate] = useState<{sha:string;message:string;date:string;url:string} | null>(null)
+  const [latestUpdate, setLatestUpdate] = useState<{sha:string;message:string;date:string;url:string;installerUrl:string|null} | null>(null)
   const [updateCheckMessage, setUpdateCheckMessage] = useState('Check GitHub for the latest AfroStudio-AI changes.')
   const [lastUpdateCheck, setLastUpdateCheck] = useState('')
   const [bpm, setBpm] = useState(122)
@@ -924,29 +924,46 @@ export default function App() {
   }
   const checkForUpdates = async () => {
     setUpdateCheckState('checking')
-    setUpdateCheckMessage('Checking the project repository…')
+    setUpdateCheckMessage('Checking the latest code and Windows installer…')
     try {
-      const response = await fetch('https://api.github.com/repos/wazzapr/AfroStudio-AI/commits/feat/studio-foundation', { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' })
-      if (!response.ok) throw new Error(response.status === 403 ? 'GitHub rate limit reached. Try again later.' : 'GitHub could not be reached right now.')
-      const data: unknown = await response.json()
+      const headers = { Accept: 'application/vnd.github+json' }
+      const [commitResponse, releaseResponse] = await Promise.all([
+        fetch('https://api.github.com/repos/wazzapr/AfroStudio-AI/commits/feat/studio-foundation', { headers, cache: 'no-store' }),
+        fetch('https://api.github.com/repos/wazzapr/AfroStudio-AI/releases/tags/nightly', { headers, cache: 'no-store' }),
+      ])
+      if (!commitResponse.ok) throw new Error(commitResponse.status === 403 ? 'GitHub rate limit reached. Try again later.' : 'GitHub could not be reached right now.')
+      const data: unknown = await commitResponse.json()
       if (!data || typeof data !== 'object') throw new Error('GitHub returned an unexpected response.')
       const commit = data as {sha?:unknown;html_url?:unknown;commit?:{message?:unknown;committer?:{date?:unknown}}}
       if (typeof commit.sha !== 'string') throw new Error('GitHub did not return a commit version.')
       const message = typeof commit.commit?.message === 'string' ? commit.commit.message.split(String.fromCharCode(10))[0] : 'Latest project changes'
       const date = typeof commit.commit?.committer?.date === 'string' ? commit.commit.committer.date : ''
       const url = typeof commit.html_url === 'string' ? commit.html_url : 'https://github.com/wazzapr/AfroStudio-AI/commits/feat/studio-foundation'
-      setLatestUpdate({ sha: commit.sha, message, date, url })
+      let installerUrl: string | null = null
+      if (releaseResponse.ok) {
+        const releaseData: unknown = await releaseResponse.json()
+        if (releaseData && typeof releaseData === 'object') {
+          const release = releaseData as {assets?:unknown}
+          if (Array.isArray(release.assets)) {
+            const installer = release.assets.find((asset: unknown) => asset && typeof asset === 'object' && typeof (asset as {name?:unknown}).name === 'string' && String((asset as {name:string}).name).toLowerCase().endsWith('.exe')) as {browser_download_url?:unknown} | undefined
+            if (installer && typeof installer.browser_download_url === 'string') installerUrl = installer.browser_download_url
+          }
+        }
+      }
+      setLatestUpdate({ sha: commit.sha, message, date, url, installerUrl })
       setLastUpdateCheck(new Date().toLocaleString())
       window.localStorage.setItem('afrostudio-last-seen-update-sha', commit.sha)
       setUpdateCheckState('checked')
-      setUpdateCheckMessage('GitHub is reachable. Download the latest project ZIP to get the newest source files.')
+      setUpdateCheckMessage(installerUrl
+        ? 'The latest Windows installer is available. Download it, close AfroStudio, then run the installer to update.'
+        : 'Latest source checked, but the Windows installer is not published yet. Try again after the installer build finishes.')
     } catch (error) {
       setUpdateCheckState('error')
       setUpdateCheckMessage(error instanceof Error ? error.message : 'Could not check for updates.')
     }
   }
   const downloadLatestUpdate = () => {
-    window.open('https://github.com/wazzapr/AfroStudio-AI/archive/refs/heads/feat/studio-foundation.zip', '_blank', 'noopener,noreferrer')
+    window.open(latestUpdate?.installerUrl || 'https://github.com/wazzapr/AfroStudio-AI/actions/workflows/windows-installer.yml', '_blank', 'noopener,noreferrer')
   }
   const filteredDrumSamples = drumSamples.filter(sample => sample.name.toLowerCase().includes(sampleSearch.trim().toLowerCase()))
   const nav = [{ name: 'Playlist', Icon: Layers3 }, { name: 'Piano Roll', Icon: Music2 }, { name: 'Channel Rack', Icon: Drum }, { name: 'Sampler', Icon: FileAudio }, { name: 'Mixer', Icon: SlidersHorizontal }]
@@ -971,13 +988,13 @@ export default function App() {
       <main className="main-content">
         <div className="page-heading"><div><div className="eyebrow"><i/> YOUR CREATIVE SPACE</div><h1>{view==='Playlist'?'Arrangement':view}</h1><p>{view==='Reference Track'?'Discover the DNA of a track. Create something that feels like you.':'Build your next Afro House record, one layer at a time.'}</p></div><div className="heading-actions"><button className="small-icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15}/></button><button className="small-icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" onClick={redo}><Redo2 size={15}/></button><button className="secondary-button" onClick={()=>fileInput.current?.click()}><Upload size={15}/> Import audio</button><button className="secondary-button" onClick={async()=>{notify("Rendering Playlist arrangement to WAV…");try{let referenceAudio:AudioBuffer|undefined;if(audioUrl){const response=await fetch(audioUrl);const bytes=await response.arrayBuffer();const decodeContext=new AudioContext();try{referenceAudio=await decodeContext.decodeAudioData(bytes)}finally{await decodeContext.close()}}await exportArrangementWav({bpm,master,steps,notes,clips,channelLevels,referenceAudio,drumSamples:drumSamples.map(sample=>sample.buffer),drumSampleIds:drumSamples.map(sample=>sample.id),rowSampleIds,bars:Math.min(16,Math.max(8,...clips.filter(clip=>clip.lane!==2||Boolean(audioUrl)).map(clip=>Math.ceil((clip.startBar??0)+clip.duration)))),selectedInstrument,mutedChannels});notify("Arrangement WAV exported successfully.")}catch{notify("WAV export failed in this browser.")}}}><Download size={15}/> Export WAV</button><input ref={fileInput} type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden onChange={e=>importFile(e.target.files?.[0])}/><button className="primary-button" onClick={()=>setView('Reference Track')}><Sparkles size={15}/> AI Assistant</button></div></div>
         {view==='Updates'&&<section className="panel update-panel">
-          <div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><RefreshCw size={16}/></div><div><h2>AfroStudio Updates</h2><p>Check GitHub and download the newest project files</p></div></div><button className="secondary-button compact" onClick={()=>void checkForUpdates()} disabled={updateCheckState==='checking'}><RefreshCw size={14}/>{updateCheckState==='checking'?'Checking…':'Check for updates'}</button></div>
+          <div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><RefreshCw size={16}/></div><div><h2>AfroStudio Updates</h2><p>Check for a newer Windows installer</p></div></div><button className="secondary-button compact" onClick={()=>void checkForUpdates()} disabled={updateCheckState==='checking'}><RefreshCw size={14}/>{updateCheckState==='checking'?'Checking…':'Check for updates'}</button></div>
           <div className="update-content">
             <div className="update-status-card"><div className="update-status-icon"><RefreshCw size={22}/></div><div><strong>{updateCheckState==='checking'?'Checking GitHub…':updateCheckState==='error'?'Could not check updates':updateCheckState==='checked'?'Repository checked':'Keep AfroStudio up to date'}</strong><p>{updateCheckMessage}</p>{lastUpdateCheck&&<small>Last checked: {lastUpdateCheck}</small>}</div></div>
             {latestUpdate&&<div className="update-version-card"><div><span className="update-label">LATEST GITHUB COMMIT</span><strong>{latestUpdate.message}</strong><p>{latestUpdate.sha.slice(0,7)}{latestUpdate.date?' · '+new Date(latestUpdate.date).toLocaleString():''}</p></div><a href={latestUpdate.url} target="_blank" rel="noreferrer">View commit ↗</a></div>}
-            <button className="primary-button update-download-button" onClick={downloadLatestUpdate}><Download size={16}/> Download latest project ZIP <span>→</span></button>
-            <div className="update-warning"><strong>Important: this is an early updater.</strong><p>AfroStudio currently runs as a web app, so it cannot replace its own installed program files. This downloads the newest source ZIP from GitHub; it does not silently install or overwrite your project. A true one-click update needs the Windows desktop installer and updater, which we still need to build.</p></div>
-            <div className="update-help"><strong>How to use the ZIP for now</strong><ol><li>Download and extract the ZIP.</li><li>Keep a backup of your project files and local samples.</li><li>Follow the updated README to run the new version.</li></ol><p>Your saved music projects and samples are stored separately in your browser, but keep backups before changing versions.</p></div>
+            <button className="primary-button update-download-button" onClick={downloadLatestUpdate}><Download size={16}/>{latestUpdate?.installerUrl?'Download Windows installer':'Open installer builds'} <span>→</span></button>
+            <div className="update-warning"><strong>Updates require one manual step.</strong><p>This page downloads the Windows setup installer when one has been published. Close AfroStudio before running it, follow the installer prompts, and back up important project files first. It does not silently replace files while the app is open.</p></div>
+            <div className="update-help"><strong>What the updater checks</strong><ol><li>Checks the latest source commit on GitHub.</li><li>Looks for the published Windows installer.</li><li>Opens the installer download when available, or the build page while a new installer is being built.</li></ol><p>The installer includes the desktop app and local bridge, but not a multi-gigabyte AI model. Full automatic in-app replacement is a separate future milestone.</p></div>
           </div>
         </section>}
         {view==='Playlist'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon lime"><Layers3 size={16}/></div><div><h2>Playlist</h2><p>Arrange patterns, vocals and audio on the timeline</p></div></div><div className="panel-tools"><span className="tiny-status" title="Automatic project recovery is stored in this browser"><i className={`status-dot ${autosaveStatus === 'saved' ? 'green' : autosaveStatus === 'unavailable' ? 'orange' : ''}`}/>{autosaveStatus === 'loading' ? 'AUTO-SAVE…' : autosaveStatus === 'saving' ? 'SAVING…' : autosaveStatus === 'saved' ? 'AUTO-SAVED' : autosaveStatus === 'unavailable' ? 'AUTO-SAVE UNAVAILABLE' : 'AUTO-SAVE READY'}</span><button className="small-icon-button" title="Add pattern clip" onClick={()=>{const id=Date.now();setClips(old=>[...old,{id,name:'New pattern',duration:4,color:colors[0],lane:0,startBar:0}]);setSelectedClipId(id);notify('New pattern clip added.')}}><Plus size={16}/></button><button className="small-icon-button" title="Duplicate selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={duplicatePattern}><Copy size={15}/></button><button className="small-icon-button" title="Delete selected clip" disabled={!clips.some(c=>c.id===selectedClipId)} onClick={()=>{setClips(old=>old.filter(c=>c.id!==selectedClipId));setSelectedClipId(null);notify('Clip deleted.')}}><Trash2 size={15}/></button><button className="small-icon-button" title="Import audio" onClick={()=>fileInput.current?.click()}><FolderOpen size={16}/></button></div></div><div className="timeline-wrap"><div className="timeline-ruler"><div className="track-label-spacer">TRACKS</div><div className="ruler-beats">{Array.from({length:17},(_,i)=><div key={i} className="ruler-number">{i+1}<span/></div>)}</div></div>{['Drums & Percussion','Bass & Groove','Reference / Audio','Melody & Atmosphere'].map((lane,i)=><div className="timeline-row" key={lane}><div className="track-label"><i className="track-color" style={{background:colors[i]}}/><span>{lane}</span><button onClick={()=>notify(lane+' track options')}>···</button></div><div className="timeline-grid" title="Click an empty bar to seek" onClick={e=>{if((e.target as HTMLElement).closest(".audio-clip"))return;const rect=e.currentTarget.getBoundingClientRect();const bar=Math.max(0,Math.min(15,Math.floor(((e.clientX-rect.left)/rect.width)*16)));const nextStep=bar*16;stepRef.current=nextStep;setPlayheadStep(nextStep);if(!playing){nextTickAtRef.current=0;if(audioElement.current)audioElement.current.currentTime=bar*4*60/bpm}}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();e.stopPropagation();const rect=e.currentTarget.getBoundingClientRect();const bar=Math.max(0,Math.min(15,Math.floor(((e.clientX-rect.left)/rect.width)*16)));const file=e.dataTransfer.files?.[0];if(file){importFile(file,bar);return}const id=Number(e.dataTransfer.getData('text/plain'));if(!id)return;setClips(old=>old.map(c=>c.id===id?{...c,lane:i,startBar:bar,duration:Math.max(1,Math.min(c.duration,16-bar))}:c));setSelectedClipId(id);notify('Clip moved to bar '+(bar+1)+'.')}}>{Array.from({length:16},(_,j)=><div key={j} className="grid-beat"/>)}<div className="playhead-line" style={{left:((playheadStep/256)*100)+'%'}} aria-hidden="true"/>{clips.filter(c=>c.lane===i).map(c=><button key={c.id} draggable className="audio-clip" title="Drag to move this clip between bars and tracks" onDragStart={e=>{if(clipResizeRef.current?.id===c.id){e.preventDefault();return}e.dataTransfer.setData('text/plain',String(c.id));e.dataTransfer.effectAllowed='move'}} style={{boxShadow:selectedClipId===c.id?'0 0 0 2px #ffffff':'none',left:((c.startBar??(c.id===3?0:(c.id%3))) * 6.25)+'%',width:Math.min(100-((c.startBar??0)*6.25),Math.max(6.25,Math.ceil(c.duration)*6.25))+'%',background:c.color+'20',borderColor:c.color+'70'}} onClick={()=>{setSelectedClipId(c.id);notify('Selected clip: '+c.name)}} onDoubleClick={e=>{e.stopPropagation();setSelectedClipId(c.id);renameSelectedClip(c.id)}}><span className="clip-wave" style={{color:c.color}}>{Array.from({length:38},(_,k)=><i key={k} style={{height:(18+((k*17+c.id*11)%72))+'%'}}/>)}</span><span className="clip-name">{c.name}</span><span className="clip-resize-handle" role="slider" aria-label={'Resize '+c.name} title="Drag to resize clip by whole bars" onPointerDown={e=>{e.preventDefault();e.stopPropagation();const grid=e.currentTarget.closest('.timeline-grid');if(!grid)return;const startBar=c.startBar??0;clipResizeRef.current={id:c.id,pointerId:e.pointerId,startX:e.clientX,startDuration:Math.min(c.duration,16-startBar),startBar,barWidth:grid.getBoundingClientRect().width/16};setSelectedClipId(c.id)}} onClick={e=>e.stopPropagation()} /></button>)}</div></div>)}</div><div className="timeline-footer"><span><i className="status-dot green"/> 4 tracks</span><span>Snap: Bar <ChevronDown size={12}/></span><span>Zoom <button onClick={()=>notify('Zoom out')}>−</button> <button onClick={()=>notify('Zoom in')}>+</button></span><span className="footer-hint">Space: Play · Ctrl+Z: Undo · Ctrl+S: Save</span></div></section>}
