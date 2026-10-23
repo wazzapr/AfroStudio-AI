@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows-installer:
@@ -37,3 +37,17 @@ jobs:
           path: release/*.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Publish rolling nightly installer release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: AfroStudio AI Nightly
+          body: |
+            Automated development build of AfroStudio AI for Windows.
+
+            This is a pre-release for testing. Back up your projects before updating.
+            The installer includes the desktop app and local bridge, but does not include an AI model.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: release/*.exe
