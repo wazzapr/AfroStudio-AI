@@ -44,7 +44,11 @@ declare global {
 }
 
 const PLAYER_URL = 'https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js'
-const DATA_URL = 'https://surikov.github.io/webaudiofontdata/sound/'
+const REMOTE_DATA_URL = 'https://surikov.github.io/webaudiofontdata/sound/'
+// Packaged Electron builds ship these starter samples alongside the app. The development browser still uses the public library.
+const DATA_URL = window.location.protocol === 'file:'
+  ? new URL('./soundfonts/', document.baseURI).href
+  : REMOTE_DATA_URL
 const playerScripts = new Map<string, Promise<void>>()
 const players = new WeakMap<AudioContext, WebAudioFontPlayerInstance>()
 const loadedPresets = new WeakMap<AudioContext, Map<number, Promise<WebAudioFontPreset>>>()
