@@ -9,7 +9,7 @@ The project is an early, actively developed desktop-capable studio foundation. C
 - Playlist with draggable pattern/audio clips, transport, tempo control, and arrangement playback.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
 - A first sample-based instrument browser with 12 General MIDI SoundFont presets: grand/electric piano, nylon/steel guitar, acoustic/finger/synth bass, strings, trumpet, French horn, flute, and warm pad. Presets load from the WebAudioFont-hosted FluidR3 bank on first use and are used for Piano Roll playback and WAV export when loaded.
-- Channel Rack and Piano Roll editing, lightweight synth presets, starter playback effects, project save/load, and WAV arrangement export.
+- Channel Rack and Piano Roll editing, 12 real sample-based starter instruments (piano, electric piano, guitars, basses, strings, brass, flute and pad), searchable Instrument Rack, lightweight synth presets, starter playback effects, project save/load, and WAV arrangement export.
 - Local procedural Afro House idea generation. This is not a trained AI music-generation model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting selected items.
