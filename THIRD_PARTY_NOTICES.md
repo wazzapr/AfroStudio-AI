@@ -2,7 +2,7 @@
 
 ## FluidR3 General MIDI presets
 
-AfroStudio AI's Windows installer build includes a starter set of 12 converted instrument presets derived from the FluidR3 General MIDI SoundFont by Frank Wen and contributors. The preset data is distributed through the WebAudioFont data project:
+AfroStudio AI's Windows installer build includes a starter set of 32 converted instrument presets derived from the FluidR3 General MIDI SoundFont by Frank Wen and contributors. The preset data is distributed through the WebAudioFont data project:
 
 - WebAudioFont data: https://github.com/surikov/webaudiofontdata
 - FluidR3 license reference: https://github.com/musescore/MuseScore/blob/deprecated_master/share/sound/FluidR3Mono_License.md
@@ -10,7 +10,7 @@ AfroStudio AI's Windows installer build includes a starter set of 12 converted i
 
 The original FluidR3 SoundFont is released under the MIT license. The copyright and permission notice must accompany copies or substantial portions. The instrument presets are downloaded by the Windows installer workflow from the WebAudioFont data host and bundled into the installer so the sample data itself is available locally.
 
-The bundled starter preset numbers are General MIDI programs 0, 4, 24, 25, 32, 33, 38, 48, 56, 60, 73, and 89 (grand piano, electric piano, nylon guitar, steel guitar, acoustic bass, finger bass, synth bass, strings, trumpet, French horn, flute, and warm pad).
+The bundled starter presets cover grand/electric piano, music box, marimba, church organ, nylon/steel/overdriven guitars, acoustic/finger/fretless/slap/synth basses, violin, cello, orchestral harp, warm/synth strings, choir aahs, voice oohs, synth voice, trumpet, French horn, synth brass, soprano sax, oboe, clarinet, flute, pan flute, warm pad, sitar, and koto.
 
 ## WebAudioFont playback engine
 
