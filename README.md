@@ -10,10 +10,14 @@ The project is an early, actively developed desktop-capable studio foundation. C
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
 - Channel Rack and Piano Roll editing, a searchable Instrument Rack with 32 sample-based General MIDI instruments (piano, electric piano, music box, marimba, organ, guitars, multiple basses, violin, cello, harp, strings, choir/voice, brass, saxophone, woodwinds, pads and world instruments), lightweight synth presets, project save/load, MIDI export and WAV arrangement export.
 - A six-effect rack with low-cut EQ, compressor, short echo, tempo delay, generated reverb and chorus/vocal-doubler processing for instruments, drums and imported-audio preview. A simple vocal pitch/speed control is included; it changes playback speed too and is not a studio-quality independent pitch shifter.
-- Local procedural Afro House idea generation. This is not a trained AI music-generation model.
+- A local Studio Assistant that can execute supported commands, including chained requests such as “set BPM to 120, load trumpet, enable reverb”. It can set tempo/master volume/vocal preview pitch, load instruments, enable effects, create clips and open studio pages. This is a command-rule assistant, not yet a connected ChatGPT model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting selected items.
 - An in-app Updates page that checks the latest source commit and looks for the published Windows installer. It can open the installer download, but you must close the app and run the installer manually; silent in-app replacement is not implemented.
+
+## Studio Assistant and future cloud AI
+
+The assistant now supports several local actions in one request. This provides the first action-bot foundation: commands change real project state instead of only replying with suggestions. A future cloud language-model connector can translate natural language into the same safe action set, but would require a separately configured provider/API key and may have usage costs. A ChatGPT subscription does not automatically include API usage. The app is designed to keep normal editing and local command actions free.
 
 ## Windows setup status
 
@@ -26,7 +30,7 @@ A Windows desktop build is now being added with Electron. The Windows Installer 
 - Not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - AI full-song generation from uploaded audio requires a compatible local model service; the bridge alone does not generate music.
 - Native VST3 plugin hosting, deep synth design comparable to Omnisphere/Nexus, additional downloadable sound packs, automation, advanced independent vocal pitch-shifting, and a low-latency desktop audio engine remain future milestones.
-- The Windows installer workflow downloads and bundles the 32 FluidR3 sample preset files locally. The small WebAudioFont playback-engine script is still loaded from its upstream host, so instrument playback needs internet whenever that engine is not already cached; offline playback is not guaranteed. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine.
+- The Windows installer workflow downloads and bundles 32 FluidR3 General MIDI sample preset files and the WebAudioFont playback-engine script locally. These starter sounds are not a 50 GB Omnisphere-scale library, but desktop instrument playback should not need an internet connection for these bundled banks. The browser development version still loads sample data from upstream. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine.
 - The desktop installer bundles the studio interface and a standalone local bridge executable, so the bridge does not require a separate Python installation. It does not install an AI music-generation model, and the installer still needs testing on a real Windows PC.
 
 ## Try it on Windows
