@@ -598,7 +598,7 @@ export default function App() {
     setAssistantMessages(old => [...old, { role: 'user', text: command }])
     setLocalModelStatus('checking')
     try {
-      const endpoint = localAiUrl.replace(/\\/+$/, '') + '/assistant'
+      const endpoint = localAiUrl.replace(/\/+$/, '') + '/assistant'
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
