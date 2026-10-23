@@ -18,6 +18,22 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+      - name: Bundle starter instrument sample banks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'public/soundfonts' | Out-Null
+          $programs = @(0, 4, 24, 25, 32, 33, 38, 48, 56, 60, 73, 89)
+          foreach ($program in $programs) {
+            $suffix = ($program * 10).ToString('D4')
+            $file = "${suffix}_FluidR3_GM_sf2_file.js"
+            $url = "https://surikov.github.io/webaudiofontdata/sound/$file"
+            Write-Host "Downloading bundled instrument: $file"
+            Invoke-WebRequest -Uri $url -OutFile (Join-Path 'public/soundfonts' $file)
+            if ((Get-Item (Join-Path 'public/soundfonts' $file)).Length -lt 1000) {
+              throw "Downloaded instrument preset looks incomplete: $file"
+            }
+          }
       - name: Set up Python for bundling the local bridge
         uses: actions/setup-python@v5
         with:
