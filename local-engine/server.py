@@ -19,6 +19,8 @@ HOST = "127.0.0.1"
 PORT = 7860
 ALLOWED_ORIGINS = {"http://localhost:5173", "http://127.0.0.1:5173"} | {origin.strip() for origin in os.environ.get("AFROSTUDIO_ALLOWED_ORIGINS", "").split(",") if origin.strip()}
 ACESTEP_API_URL = os.environ.get("ACESTEP_API_URL", "http://127.0.0.1:8001").rstrip("/")
+OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
 TASKS = {}
 TASKS_LOCK = threading.Lock()
 MAX_PROMPT_LENGTH = 2000
@@ -128,6 +130,70 @@ def generation_worker(task_id, prompt, bpm, duration, reference_bytes=None, refe
             TASKS[task_id].update({"status": "failed", "message": str(error)[:500]})
 
 
+def request_ollama_actions(message, model=None):
+    """Translate a natural-language studio request into safe, existing studio commands."""
+    if not isinstance(message, str) or not message.strip() or len(message) > 2000:
+        raise ValueError("Message must contain 1–2000 characters.")
+    chosen_model = model if isinstance(model, str) and model.strip() else OLLAMA_MODEL
+    if len(chosen_model) > 100 or any(char in chosen_model for char in "\r\n"):
+        raise ValueError("Invalid local model name.")
+
+    system_prompt = (
+        "You are the command planner for AfroStudio AI, a music workstation. "
+        "Return ONLY a JSON object with a commands array containing 1 to 6 short strings. "
+        "Each string must be a single supported studio command, not code. Supported commands: "
+        "'set BPM to 122'; 'set master volume to 75'; 'set vocal pitch to +2'; "
+        "'load Grand Piano' (also use exact names like Trumpet, Nylon Guitar, Warm Strings, Choir Aahs, Finger Bass); "
+        "'enable reverb', 'enable delay', 'enable chorus', 'enable compressor', 'enable EQ'; "
+        "'disable reverb', 'disable delay', 'disable chorus', 'disable compressor', 'disable EQ'; "
+        "'make an Afro House idea'; 'add bass clip'; 'add melody clip'; 'add drum clip'; "
+        "'open Playlist', 'open Piano Roll', 'open Channel Rack', 'open Mixer', 'open Instruments', "
+        "'open Effects', 'open Reference Track'; 'play arrangement'; 'stop arrangement'; 'save project'. "
+        "Use only these actions. Do not claim you generated full AI audio. For a track request, "
+        "create an idea, set a suitable tempo, choose an instrument, and enable relevant effects. "
+        "If a requested feature is unsupported, return the closest supported actions. Never output shell commands, URLs, code, or arbitrary tool names."
+    )
+    payload = {
+        "model": chosen_model,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.1},
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message.strip()},
+        ],
+    }
+    request = Request(
+        OLLAMA_API_URL + "/api/chat",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=90) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        if error.code == 404:
+            raise RuntimeError("Ollama is running, but model '" + chosen_model + "' is not installed. In Ollama, run: ollama pull " + chosen_model)
+        raise RuntimeError("Local Ollama returned HTTP " + str(error.code) + ".")
+    except URLError:
+        raise RuntimeError("Ollama is not running at " + OLLAMA_API_URL + ". Install Ollama and pull " + chosen_model + " to enable natural-language planning.")
+    except TimeoutError:
+        raise RuntimeError("The local model took too long to respond. Try a smaller Ollama model.")
+    content = result.get("message", {}).get("content", "") if isinstance(result, dict) else ""
+    try:
+        plan = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        raise RuntimeError("The local model did not return a valid action plan. Try again or use local command mode.")
+    commands = plan.get("commands") if isinstance(plan, dict) else None
+    if not isinstance(commands, list):
+        raise RuntimeError("The local model returned no command list.")
+    commands = [item.strip()[:200] for item in commands if isinstance(item, str) and item.strip()][:6]
+    if not commands:
+        raise RuntimeError("The local model returned no supported actions.")
+    return {"available": True, "model": chosen_model, "commands": commands}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AfroStudioLocalEngine/0.2"
 
@@ -169,7 +235,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == "/health":
+        if self.path == "/assistant/status":
+            try:
+                request = Request(OLLAMA_API_URL + "/api/tags", headers={"Accept": "application/json"})
+                with urlopen(request, timeout=2) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                models = [item.get("name", "") for item in result.get("models", []) if isinstance(item, dict)]
+                self._send_json(200, {"available": True, "model": OLLAMA_MODEL, "installed_models": models, "message": "Local Ollama is running."})
+            except Exception:
+                self._send_json(200, {"available": False, "model": OLLAMA_MODEL, "installed_models": [], "message": "Ollama is optional. Install it and run: ollama pull " + OLLAMA_MODEL})
+        elif self.path == "/health":
             self._send_json(200, {"status": "ok", "service": "afrostudio-local-engine", "version": "0.2.0"})
         elif self.path == "/status":
             provider = probe_ace_step()
@@ -201,6 +276,24 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"status": "error", "message": "Unknown endpoint. Try /health or /status."})
 
     def do_POST(self):
+        if self.path == '/assistant':
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+                if length <= 0 or length > 12000:
+                    self._send_json(400, {'available': False, 'message': 'Request is empty or too large.'})
+                    return
+                payload = json.loads(self.rfile.read(length).decode('utf-8'))
+                if not isinstance(payload, dict):
+                    raise ValueError('Request body must be a JSON object.')
+                result = request_ollama_actions(payload.get('message', ''), payload.get('model'))
+                self._send_json(200, result)
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
+                self._send_json(400, {'available': False, 'message': str(error)})
+            except RuntimeError as error:
+                self._send_json(503, {'available': False, 'message': str(error)})
+            except Exception as error:
+                self._send_json(502, {'available': False, 'message': 'Could not contact the local model: ' + str(error)[:240]})
+            return
         if self.path != '/generate':
             self._send_json(404, {'status': 'error', 'message': 'Unknown endpoint. Use POST /generate.'})
             return
