@@ -1104,6 +1104,7 @@ export default function App() {
       setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture', ...SOUND_FONT_INSTRUMENTS.map(item => item.name)].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Grand Piano')
       setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
       setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 6 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false,false,false])
+      if (typeof data.vocalPitchSemitones === 'number' && Number.isFinite(data.vocalPitchSemitones)) setVocalPitchSemitones(Math.max(-12, Math.min(12, data.vocalPitchSemitones)))
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
