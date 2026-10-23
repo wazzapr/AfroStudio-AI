@@ -45,6 +45,10 @@
           "!**/__pycache__/**",
           "!**/.venv/**"
         ]
+      },
+      {
+        "from": "release-engine/AfroStudioLocalEngine.exe",
+        "to": "AfroStudioLocalEngine.exe"
       }
     ],
     "win": {
