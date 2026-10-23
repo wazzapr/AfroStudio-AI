@@ -281,6 +281,11 @@ export default function App() {
       }
       referenceEffectNodesRef.current = nodes
       if (ctx.state === 'suspended') void ctx.resume()
+    audio.playbackRate = Math.pow(2, vocalPitchSemitones / 12)
+    const pitchableAudio = audio as HTMLMediaElement & { preservesPitch?: boolean; mozPreservesPitch?: boolean; webkitPreservesPitch?: boolean }
+    if ('preservesPitch' in pitchableAudio) pitchableAudio.preservesPitch = false
+    if ('mozPreservesPitch' in pitchableAudio) pitchableAudio.mozPreservesPitch = false
+    if ('webkitPreservesPitch' in pitchableAudio) pitchableAudio.webkitPreservesPitch = false
     } catch {
       // Keep the imported file usable even if the browser cannot create a media-element audio route.
       try { audioElement.current?.load() } catch { /* Browser fallback only. */ }
@@ -293,11 +298,6 @@ export default function App() {
       }
       referenceEffectNodesRef.current = []
     }
-    audio.playbackRate = Math.pow(2, vocalPitchSemitones / 12)
-    const pitchableAudio = audio as HTMLMediaElement & { preservesPitch?: boolean; mozPreservesPitch?: boolean; webkitPreservesPitch?: boolean }
-    if ('preservesPitch' in pitchableAudio) pitchableAudio.preservesPitch = false
-    if ('mozPreservesPitch' in pitchableAudio) pitchableAudio.mozPreservesPitch = false
-    if ('webkitPreservesPitch' in pitchableAudio) pitchableAudio.webkitPreservesPitch = false
   }, [audioUrl, audioContext, enabledEffects, bpm, vocalPitchSemitones])
   useEffect(() => {
     const move = (event: PointerEvent) => {
