@@ -12,11 +12,11 @@ The project is an early, actively developed browser-based studio foundation. Cur
 - Local procedural Afro House idea generation. This is not a trained AI music-generation model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting selected items.
-- An in-app Updates page that checks the latest commit on GitHub and opens a download of the latest branch ZIP. Because the app is currently a browser-based Vite app, this is a source-download helper, not yet a one-click self-installing updater.
+- An in-app Updates page that checks the latest source commit and looks for the published Windows installer. It can open the installer download, but you must close the app and run the installer manually; silent in-app replacement is not implemented.
 
 ## Windows setup status
 
-A Windows desktop build is now being added with Electron. The Windows Installer workflow builds a setup `.exe`, bundles the local Python bridge into a standalone Windows executable, and publishes the installer as a downloadable GitHub Actions artifact when the build succeeds. The packaged app serves its interface locally and starts the bridge automatically. The \`local-engine/setup-windows.ps1\` helper is an early setup step: it checks Python, disk space, and NVIDIA GPU information, prepares the local bridge environment, and can start the bridge.
+A Windows desktop build is now being added with Electron. The Windows Installer workflow builds a setup `.exe`, bundles the local Python bridge into a standalone Windows executable, uploads a build artifact, and publishes a rolling `nightly` pre-release when the build succeeds. Installer builds are serialized so older commits do not race to overwrite the latest download. The packaged app serves its interface locally and starts the bridge automatically. The \`local-engine/setup-windows.ps1\` helper is an early setup step: it checks Python, disk space, and NVIDIA GPU information, prepares the local bridge environment, and can start the bridge.
 
 **The helper does not install ACE-Step or download AI model weights yet.** We must verify a safe, compatible installation route before automating multi-gigabyte downloads. The current PC described by the project owner has a GTX 750 Ti with 2 GB VRAM; ACE-Step 1.5's documented low-memory recommendation is at least 4 GB, so compatibility cannot be promised. No paid generation API is required by the design.
 
@@ -29,7 +29,7 @@ A Windows desktop build is now being added with Electron. The Windows Installer 
 
 ## Try it on Windows
 
-To get the Windows installer, open [GitHub Actions](https://github.com/wazzapr/AfroStudio-AI/actions/workflows/windows-installer.yml), select the latest successful **Windows installer** run, and download the `AfroStudio-AI-Windows-Installer` artifact. Extract the artifact ZIP and run the `.exe` inside it. This installer is an early build; it bundles the bridge but does not install the AI model. If the workflow has not completed successfully yet, use the source ZIP steps below as a temporary fallback.
+To get the latest Windows installer, open the [AfroStudio AI Nightly release](https://github.com/wazzapr/AfroStudio-AI/releases/tag/nightly) and download `AfroStudio-AI-Setup-0.1.0.exe`. You can also use the [Windows installer workflow](https://github.com/wazzapr/AfroStudio-AI/actions/workflows/windows-installer.yml) to see build status. If the nightly release does not exist or has no installer asset yet, wait for a successful workflow run and refresh. Run the `.exe` and follow the setup prompts. This is an early testing build; it bundles the bridge but does not install the AI model.
 
 To try the latest source on Windows without the installer:
 
