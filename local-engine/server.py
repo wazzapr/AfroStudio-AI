@@ -17,7 +17,7 @@ import uuid
 
 HOST = "127.0.0.1"
 PORT = 7860
-ALLOWED_ORIGINS = {"http://localhost:5173", "http://127.0.0.1:5173"}
+ALLOWED_ORIGINS = {"http://localhost:5173", "http://127.0.0.1:5173"} | {origin.strip() for origin in os.environ.get("AFROSTUDIO_ALLOWED_ORIGINS", "").split(",") if origin.strip()}
 ACESTEP_API_URL = os.environ.get("ACESTEP_API_URL", "http://127.0.0.1:8001").rstrip("/")
 TASKS = {}
 TASKS_LOCK = threading.Lock()
