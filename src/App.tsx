@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { AudioWaveform, Bot, Check, ChevronDown, Copy, Disc3, Download, Drum, FileAudio, FolderOpen, Layers3, Music2, Pause, Play, Plus, Redo2, RefreshCw, Save, Settings2, SlidersHorizontal, Sparkles, Square, Trash2, Undo2, Upload, Volume2, Waves, WandSparkles, X } from 'lucide-react'
 import { exportArrangementWav } from './audio/exportWav'
 import { exportPianoRollMidi } from './audio/exportMidi'
@@ -465,7 +465,7 @@ export default function App() {
     }
     setAssistantMessages(old => [...old, { role: 'assistant', text: reply }])
   }
-  const submitStudioCommand = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitStudioCommand = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const command = assistantInput
     setAssistantInput('')
