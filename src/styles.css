@@ -69,3 +69,31 @@
 .assistant-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .assistant-examples > span { color: var(--muted, #a0a4ad); font-size: 9px; font-weight: 800; letter-spacing: .12em; margin-right: 4px; }
 @media (max-width: 720px) { .assistant-compose { flex-direction: column; } .assistant-compose .primary-button { align-self: flex-start; } .assistant-message { max-width: 100%; } }
+
+
+/* Instrument library browsing */
+.instrument-library-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 14px;
+  flex-wrap: wrap;
+}
+.instrument-library-tools .sample-search {
+  flex: 1 1 260px;
+  min-width: 190px;
+}
+.instrument-library-tools select {
+  min-height: 38px;
+  min-width: 150px;
+  padding: 0 12px;
+  color: var(--text-primary, #f2f4f5);
+  background: var(--panel-soft, #191d20);
+  border: 1px solid var(--border, #2c3236);
+  border-radius: 10px;
+}
+.instrument-library-tools > span {
+  color: var(--text-muted, #929ba0);
+  font-size: 12px;
+  white-space: nowrap;
+}
