@@ -23,6 +23,8 @@ const colors = ['#b4f36a', '#b38cff', '#55c8d8', '#ffb36b']
 export default function App() {
   const [view, setView] = useState('Playlist')
   const [assistantInput, setAssistantInput] = useState('')
+  const [localModelEnabled, setLocalModelEnabled] = useState(false)
+  const [localModelStatus, setLocalModelStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle')
   const [assistantMessages, setAssistantMessages] = useState<{role:'assistant'|'user';text:string}[]>([{role:'assistant',text:'Hi! I can operate the studio with local commands. Try “set BPM to 122”, “load trumpet”, “enable delay”, “make an Afro House idea”, or “open Piano Roll”. This first version uses built-in command rules, not a connected language model.'}])
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'checked' | 'error'>('idle')
   const [latestUpdate, setLatestUpdate] = useState<{sha:string;message:string;date:string;url:string;installerUrl:string|null} | null>(null)
@@ -501,7 +503,7 @@ export default function App() {
     const sampleNote = selected.has('Drums') && matchedSampleCount ? ' Matched ' + matchedSampleCount + ' imported drum samples by filename.' : ''
     notify((referenceTempo ? 'Created a local Afro House idea at the reference tempo (' + referenceTempo + ' BPM)' + (referenceGroove ? ' using the rough ' + referenceGroove + ' transient profile.' : '.') + ' This is heuristic pattern generation, not AI audio remixing or stem separation.' : 'Created an original Afro House starting idea locally. Refine it in the Channel Rack and Piano Roll.') + sampleNote)
   }
-  const runStudioCommand = (rawCommand: string) => {
+  const runStudioCommand = (rawCommand: string, fromAssistant = false) => {
     const command = rawCommand.trim()
     if (!command) return
     // Allow several studio actions in one message, separated by commas or the word 'then'.
@@ -510,7 +512,7 @@ export default function App() {
       sequence.forEach(part => runStudioCommand(part))
       return
     }
-    setAssistantMessages(old => [...old, { role: 'user', text: command }])
+    if (!fromAssistant) setAssistantMessages(old => [...old, { role: 'user', text: command }])
     const lower = command.toLowerCase()
     let reply = 'I could not match that command yet. Try setting BPM, loading an instrument, enabling an effect, generating an Afro House idea, adding a clip, or opening a studio page.'
     const tempoMatch = lower.match(/(?:bpm|tempo)(?:\s+to|\s*=|\s+at)?\s*(\d{2,3})/)
@@ -583,11 +585,38 @@ export default function App() {
     }
     setAssistantMessages(old => [...old, { role: 'assistant', text: reply }])
   }
-  const submitStudioCommand = (event: FormEvent<HTMLFormElement>) => {
+  const submitStudioCommand = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const command = assistantInput
+    const command = assistantInput.trim()
     setAssistantInput('')
-    runStudioCommand(command)
+    if (!command) return
+    if (!localModelEnabled) {
+      runStudioCommand(command)
+      return
+    }
+
+    setAssistantMessages(old => [...old, { role: 'user', text: command }])
+    setLocalModelStatus('checking')
+    try {
+      const endpoint = localAiUrl.replace(/\\/+$/, '') + '/assistant'
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: command }),
+      })
+      const result = await response.json() as { available?: boolean; model?: string; commands?: string[]; message?: string }
+      if (!response.ok || !result.available || !Array.isArray(result.commands) || result.commands.length === 0) {
+        throw new Error(result.message || 'The local model did not return any actions.')
+      }
+      setLocalModelStatus('online')
+      setAssistantMessages(old => [...old, { role: 'assistant', text: 'Local model ' + (result.model || 'Ollama') + ' planned ' + result.commands.length + ' studio action(s). I will execute only supported studio commands.' }])
+      result.commands.slice(0, 6).forEach(action => runStudioCommand(action, true))
+    } catch (error) {
+      setLocalModelStatus('offline')
+      const reason = error instanceof Error ? error.message : 'The local model could not be reached.'
+      setAssistantMessages(old => [...old, { role: 'assistant', text: 'Local AI is not available: ' + reason + ' I will try the built-in command rules instead.' }])
+      runStudioCommand(command, true)
+    }
   }
   const duplicatePattern = () => {
     const selected = clips.find(clip => clip.id === selectedClipId)
@@ -1231,7 +1260,8 @@ export default function App() {
         <div className="page-heading"><div><div className="eyebrow"><i/> YOUR CREATIVE SPACE</div><h1>{view==='Playlist'?'Arrangement':view}</h1><p>{view==='Reference Track'?'Discover the DNA of a track. Create something that feels like you.':'Build your next Afro House record, one layer at a time.'}</p></div><div className="heading-actions"><button className="small-icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15}/></button><button className="small-icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" onClick={redo}><Redo2 size={15}/></button><button className="secondary-button" onClick={()=>fileInput.current?.click()}><Upload size={15}/> Import audio</button><button className="secondary-button" onClick={async()=>{notify("Rendering Playlist arrangement to WAV…");try{let referenceAudio:AudioBuffer|undefined;if(audioUrl){const response=await fetch(audioUrl);const bytes=await response.arrayBuffer();const decodeContext=new AudioContext();try{referenceAudio=await decodeContext.decodeAudioData(bytes)}finally{await decodeContext.close()}}await exportArrangementWav({bpm,master,steps,notes,clips,channelLevels,referenceAudio,drumSamples:drumSamples.map(sample=>sample.buffer),drumSampleIds:drumSamples.map(sample=>sample.id),rowSampleIds,bars:Math.min(16,Math.max(8,...clips.filter(clip=>clip.lane!==2||Boolean(audioUrl)).map(clip=>Math.ceil((clip.startBar??0)+clip.duration)))),selectedInstrument,mutedChannels});notify("Arrangement WAV exported successfully.")}catch{notify("WAV export failed in this browser.")}}}><Download size={15}/> Export WAV</button><input ref={fileInput} type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden onChange={e=>importFile(e.target.files?.[0])}/><button className="primary-button" onClick={()=>setView('Reference Track')}><Sparkles size={15}/> AI Assistant</button></div></div>
         {view==='Assistant'&&<section className="panel assistant-panel">
           <div className="panel-heading"><div className="panel-title"><div className="panel-icon purple"><Bot size={16}/></div><div><h2>Studio Assistant</h2><p>Give the studio commands and let it perform supported actions</p></div></div><span className="local-tag"><i className="status-dot green"/> LOCAL COMMANDS</span></div>
-          <div className="assistant-notice"><Sparkles size={17}/><div><strong>Action-based studio control · first milestone</strong><p>This assistant can directly change tempo, load sampled instruments, toggle built-in effects, create clips, generate editable starting patterns, and open studio pages. It is not yet a connected ChatGPT model and does not claim to understand every free-form request.</p></div></div>
+          <div className="assistant-notice"><Sparkles size={17}/><div><strong>Studio agent · local actions plus optional local AI</strong><p>The built-in command bot can change tempo, load sampled instruments, toggle effects, create clips, generate editable patterns, and open studio pages. Enable the optional Ollama model below for more natural-language planning; it uses your own local model, not a paid API.</p></div></div>
+          <div className="assistant-model-panel"><label className="assistant-model-toggle"><input type="checkbox" checked={localModelEnabled} onChange={event=>{setLocalModelEnabled(event.target.checked);setLocalModelStatus('idle')}}/><span><strong>Use local AI model (Ollama)</strong><small>Optional · runs on this PC · no API key</small></span></label><span className={'assistant-model-status '+localModelStatus}>{localModelStatus==='online'?'MODEL CONNECTED':localModelStatus==='checking'?'THINKING…':localModelStatus==='offline'?'LOCAL RULES FALLBACK':'OPTIONAL'}</span><p>To enable natural-language planning, install Ollama and run <code>ollama pull qwen2.5:3b</code>. Your PC may respond slowly because the model can run on the CPU. If Ollama is not installed, switch this option off and the built-in command bot will still work.</p></div>
           <div className="assistant-transcript" aria-live="polite">{assistantMessages.map((message,index)=><div key={index} className={'assistant-message '+message.role}><div className="assistant-avatar">{message.role==='assistant'?<Bot size={15}/>:<Music2 size={15}/>}</div><div><span>{message.role==='assistant'?'AFROSTUDIO':'YOU'}</span><p>{message.text}</p></div></div>)}</div>
           <form className="assistant-compose" onSubmit={submitStudioCommand}><textarea aria-label="Studio command" rows={2} value={assistantInput} onChange={event=>setAssistantInput(event.target.value)} placeholder="Example: Set BPM to 120, load trumpet, enable delay…"/><button className="primary-button" type="submit" disabled={!assistantInput.trim()}><Sparkles size={15}/> Run command</button></form>
           <div className="assistant-examples"><span>TRY A COMMAND</span>{['Set BPM to 120, load trumpet, enable reverb','Set master volume to 75','Set vocal pitch to +2','Make an Afro House idea','Play arrangement','Save project'].map(command=><button key={command} className="secondary-button compact" onClick={()=>runStudioCommand(command)}>{command}</button>)}</div>
