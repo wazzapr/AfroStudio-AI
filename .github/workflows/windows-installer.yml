@@ -18,6 +18,16 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+      - name: Bundle local sample playback engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'public/vendor' | Out-Null
+          $playerPath = 'public/vendor/WebAudioFontPlayer.js'
+          Invoke-WebRequest -Uri 'https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js' -OutFile $playerPath
+          if ((Get-Item $playerPath).Length -lt 10000) {
+            throw 'Downloaded WebAudioFontPlayer.js looks incomplete.'
+          }
       - name: Bundle starter instrument sample banks
         shell: pwsh
         run: |
