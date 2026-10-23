@@ -40,6 +40,29 @@ class EngineApiTests(unittest.TestCase):
         self.assertTrue(result["capabilities"]["reference_audio_upload"])
         self.assertFalse(result["model"]["ready"])
 
+    @patch("server.request_ollama_actions", return_value={"available": True, "model": "qwen2.5:3b", "commands": ["set BPM to 122", "enable reverb"]})
+    def test_assistant_returns_only_planned_studio_commands(self, _planner):
+        body = json.dumps({"message": "Make a warm Afro House idea"}).encode("utf-8")
+        request = Request(self.base + "/assistant", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        with urlopen(request, timeout=2) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        self.assertTrue(result["available"])
+        self.assertEqual(result["model"], "qwen2.5:3b")
+        self.assertEqual(result["commands"], ["set BPM to 122", "enable reverb"])
+
+    @patch("server.urlopen", side_effect=OSError("Ollama is not installed"))
+    def test_assistant_status_is_optional_when_ollama_is_missing(self, _urlopen):
+        result = self.get_json("/assistant/status")
+        self.assertFalse(result["available"])
+        self.assertIn("ollama pull", result["message"])
+
+    def test_assistant_rejects_empty_message(self):
+        body = json.dumps({"message": ""}).encode("utf-8")
+        request = Request(self.base + "/assistant", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        with self.assertRaises(HTTPError) as error:
+            urlopen(request, timeout=2)
+        self.assertEqual(error.exception.code, 400)
+
     def test_unknown_route_returns_404(self):
         with self.assertRaises(HTTPError) as error:
             urlopen(self.base + "/not-a-route", timeout=2)
