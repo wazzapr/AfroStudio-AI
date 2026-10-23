@@ -518,6 +518,15 @@ export default function App() {
       const tempo = Math.max(40, Math.min(240, Number(tempoMatch[1])))
       setBpm(tempo)
       reply = 'Done — project tempo set to ' + tempo + ' BPM.'
+    } else if (/\b(play|start|resume)\b/.test(lower) && /\b(arrangement|playback|song|music|transport)\b/.test(lower)) {
+      setPlaying(true)
+      reply = 'Started arrangement playback.'
+    } else if (/\b(stop|pause)\b/.test(lower) && /\b(playback|arrangement|song|music|transport)\b/.test(lower)) {
+      setPlaying(false)
+      reply = 'Stopped arrangement playback.'
+    } else if (/\bsave (the )?(project|session)\b/.test(lower)) {
+      saveProject()
+      reply = 'Opened the project save/download action. Check your browser downloads for the saved project file.'
     } else if (/\b(master volume|master|volume)\b/.test(lower) && /\b(set|change|turn|to|at)\b/.test(lower)) {
       const volumeMatch = lower.match(/(?:to|at|=)\s*(\d{1,3})\s*%?/)
       if (volumeMatch) {
@@ -1225,7 +1234,7 @@ export default function App() {
           <div className="assistant-notice"><Sparkles size={17}/><div><strong>Action-based studio control · first milestone</strong><p>This assistant can directly change tempo, load sampled instruments, toggle built-in effects, create clips, generate editable starting patterns, and open studio pages. It is not yet a connected ChatGPT model and does not claim to understand every free-form request.</p></div></div>
           <div className="assistant-transcript" aria-live="polite">{assistantMessages.map((message,index)=><div key={index} className={'assistant-message '+message.role}><div className="assistant-avatar">{message.role==='assistant'?<Bot size={15}/>:<Music2 size={15}/>}</div><div><span>{message.role==='assistant'?'AFROSTUDIO':'YOU'}</span><p>{message.text}</p></div></div>)}</div>
           <form className="assistant-compose" onSubmit={submitStudioCommand}><textarea aria-label="Studio command" rows={2} value={assistantInput} onChange={event=>setAssistantInput(event.target.value)} placeholder="Example: Set BPM to 120, load trumpet, enable delay…"/><button className="primary-button" type="submit" disabled={!assistantInput.trim()}><Sparkles size={15}/> Run command</button></form>
-          <div className="assistant-examples"><span>TRY A COMMAND</span>{['Set BPM to 120, load trumpet, enable reverb','Set master volume to 75','Set vocal pitch to +2','Make an Afro House idea','Add a bass clip','Open Piano Roll'].map(command=><button key={command} className="secondary-button compact" onClick={()=>runStudioCommand(command)}>{command}</button>)}</div>
+          <div className="assistant-examples"><span>TRY A COMMAND</span>{['Set BPM to 120, load trumpet, enable reverb','Set master volume to 75','Set vocal pitch to +2','Make an Afro House idea','Play arrangement','Save project'].map(command=><button key={command} className="secondary-button compact" onClick={()=>runStudioCommand(command)}>{command}</button>)}</div>
         </section>}
         {view==='Updates'&&<section className="panel update-panel">
           <div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><RefreshCw size={16}/></div><div><h2>AfroStudio Updates</h2><p>Check for a newer Windows installer</p></div></div><button className="secondary-button compact" onClick={()=>void checkForUpdates()} disabled={updateCheckState==='checking'}><RefreshCw size={14}/>{updateCheckState==='checking'?'Checking…':'Check for updates'}</button></div>
