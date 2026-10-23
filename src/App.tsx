@@ -127,6 +127,7 @@ export default function App() {
             setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78,66,72,55,60])
             setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
             setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 6 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false,false,false])
+       if (typeof data.vocalPitchSemitones === 'number' && Number.isFinite(data.vocalPitchSemitones)) setVocalPitchSemitones(Math.max(-12, Math.min(12, data.vocalPitchSemitones)))
             setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture', ...SOUND_FONT_INSTRUMENTS.map(item => item.name)].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Grand Piano')
             if (typeof data.prompt === 'string') setPrompt(data.prompt)
             if (typeof data.generationDuration === 'number' && Number.isFinite(data.generationDuration)) setGenerationDuration(Math.max(10, Math.min(180, Math.round(data.generationDuration / 10) * 10)))
@@ -151,7 +152,7 @@ export default function App() {
       try {
         setAutosaveStatus('saving')
         const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, vocalPitchSemitones, rowSampleNames, rowSampleIds }
         window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
         setAutosaveStatus('saved')
       } catch {
@@ -160,7 +161,7 @@ export default function App() {
       }
     }, 700)
     return () => window.clearTimeout(timeout)
-  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, vocalPitchSemitones, rowSampleIds, drumSamples, sampleStorageReady])
   // Flush the newest project state immediately when the tab is closed or navigated away.
   // The debounced autosave is still used during editing, but a quick close should not lose
   // edits made during its 700 ms delay.
