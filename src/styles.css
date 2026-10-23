@@ -97,3 +97,31 @@
   font-size: 12px;
   white-space: nowrap;
 }
+
+
+.vocal-pitch-control {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #2c3236);
+  border-radius: 12px;
+  background: var(--panel-soft, #191d20);
+}
+.vocal-pitch-control label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.vocal-pitch-control label strong {
+  color: var(--accent, #b4f36a);
+  font-variant-numeric: tabular-nums;
+}
+.vocal-pitch-control input[type="range"] { width: 100%; }
+.vocal-pitch-control p {
+  margin: 8px 0 0;
+  color: var(--text-muted, #929ba0);
+  font-size: 12px;
+  line-height: 1.5;
+}
