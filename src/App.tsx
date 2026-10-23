@@ -262,7 +262,7 @@ export default function App() {
   }, [bpm, clips, steps, notes, master, channelLevels, enabledEffects, selectedInstrument])
   const applySnapshot = (snapshot: Snapshot) => {
     applyingHistory.current = true
-    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master); setChannelLevels(snapshot.channelLevels); setEnabledEffects(snapshot.enabledEffects ?? [false,false,false,false]); setSelectedInstrument(snapshot.selectedInstrument ?? 'Soft Keys')
+    setBpm(snapshot.bpm); setClips(snapshot.clips); setSteps(snapshot.steps); setNotes(snapshot.notes); setMaster(snapshot.master); setChannelLevels(snapshot.channelLevels); setEnabledEffects(snapshot.enabledEffects ?? [false,false,false,false,false,false]); setSelectedInstrument(snapshot.selectedInstrument ?? 'Soft Keys')
     projectRef.current = snapshot; lastSnapshot.current = snapshot
   }
   const undo = () => {
@@ -439,7 +439,7 @@ export default function App() {
     } else if (/\b(disable|turn off)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
       const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
       setEnabledEffects(old => old.map((value, index) => index === effectIndex ? false : value))
-      reply = 'Disabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay'][effectIndex] + '.'
+      reply = 'Disabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'][effectIndex] + '.'
     } else if (/\b(add|create)\b.*\b(clip|track|pattern)\b/.test(lower)) {
       const isBass = /bass/.test(lower)
       const isMelody = /melody|piano|lead/.test(lower)
@@ -1009,7 +1009,7 @@ export default function App() {
       setSelectedNoteId(null)
       setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture', ...SOUND_FONT_INSTRUMENTS.map(item => item.name)].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Grand Piano')
       setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
-      setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
+      setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 6 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false,false,false])
       setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
       setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78, 66, 72, 55, 60])
       if (typeof data.prompt === 'string') setPrompt(data.prompt)
