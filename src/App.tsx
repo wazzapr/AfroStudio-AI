@@ -504,6 +504,12 @@ export default function App() {
   const runStudioCommand = (rawCommand: string) => {
     const command = rawCommand.trim()
     if (!command) return
+    // Allow several studio actions in one message, separated by commas or the word 'then'.
+    const sequence = command.split(/\s*(?:,|\bthen\b)\s*/i).map(part => part.trim()).filter(Boolean)
+    if (sequence.length > 1) {
+      sequence.forEach(part => runStudioCommand(part))
+      return
+    }
     setAssistantMessages(old => [...old, { role: 'user', text: command }])
     const lower = command.toLowerCase()
     let reply = 'I could not match that command yet. Try setting BPM, loading an instrument, enabling an effect, generating an Afro House idea, adding a clip, or opening a studio page.'
@@ -512,6 +518,24 @@ export default function App() {
       const tempo = Math.max(40, Math.min(240, Number(tempoMatch[1])))
       setBpm(tempo)
       reply = 'Done — project tempo set to ' + tempo + ' BPM.'
+    } else if (/\b(master volume|master|volume)\b/.test(lower) && /\b(set|change|turn|to|at)\b/.test(lower)) {
+      const volumeMatch = lower.match(/(?:to|at|=)\s*(\d{1,3})\s*%?/)
+      if (volumeMatch) {
+        const volume = Math.max(0, Math.min(100, Number(volumeMatch[1])))
+        setMaster(volume)
+        reply = 'Master output set to ' + volume + '%.'
+      } else {
+        reply = 'Choose a master volume from 0 to 100, for example “set master volume to 75”.'
+      }
+    } else if (/\b(vocal pitch|pitch shift|transpose vocals?)\b/.test(lower)) {
+      const pitchMatch = lower.match(/(?:to|by|at|=)\s*([+-]?\d{1,2})/)
+      if (pitchMatch) {
+        const semitones = Math.max(-12, Math.min(12, Number(pitchMatch[1])))
+        setVocalPitchSemitones(semitones)
+        reply = 'Vocal preview pitch set to ' + (semitones > 0 ? '+' : '') + semitones + ' semitones. This simple control also changes playback speed.'
+      } else {
+        reply = 'Choose a pitch change from -12 to +12 semitones, for example “set vocal pitch to +2”.'
+      }
     } else if (/\b(make|generate|create)\b.*\b(afro house|groove|starting idea|beat|pattern)\b/.test(lower)) {
       generateAfroHouseIdea()
       reply = 'Created an editable local Afro House starting idea. I updated the Channel Rack steps, Piano Roll notes and Playlist clips where selected. This is procedural generation, not a full AI audio remix.'
