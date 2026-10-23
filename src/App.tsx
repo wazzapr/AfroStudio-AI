@@ -33,7 +33,7 @@ export default function App() {
   const [master, setMaster] = useState(78)
   const [channelLevels, setChannelLevels] = useState([78, 66, 72, 55, 60])
   const [mutedChannels, setMutedChannels] = useState<boolean[]>([false, false, false, false, false, false])
-  const [enabledEffects, setEnabledEffects] = useState<boolean[]>([false, false, false, false])
+  const [enabledEffects, setEnabledEffects] = useState<boolean[]>([false, false, false, false, false, false])
   const [selectedInstrument, setSelectedInstrument] = useState('Grand Piano')
   const [instrumentLoadMessage, setInstrumentLoadMessage] = useState('The Windows installer includes 12 sampled instruments. Select one to load and preview it.')
   const [drumSamples, setDrumSamples] = useState<DrumSample[]>([])
@@ -123,7 +123,7 @@ export default function App() {
             setMaster(typeof data.master === 'number' ? Math.max(0, Math.min(100, data.master)) : 78)
             setChannelLevels(Array.isArray(data.channelLevels) && data.channelLevels.length === 5 && data.channelLevels.every(v => typeof v === 'number') ? data.channelLevels.map(v => Math.max(0, Math.min(100, v as number))) : [78,66,72,55,60])
             setMutedChannels(Array.isArray(data.mutedChannels) && data.mutedChannels.length === 6 && data.mutedChannels.every(v => typeof v === 'boolean') ? data.mutedChannels as boolean[] : [false,false,false,false,false,false])
-            setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 4 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false])
+            setEnabledEffects(Array.isArray(data.enabledEffects) && data.enabledEffects.length === 6 && data.enabledEffects.every(v => typeof v === 'boolean') ? data.enabledEffects as boolean[] : [false,false,false,false,false,false])
             setSelectedInstrument(['Deep Kick','Warm Bass','Soft Keys','Air Texture', ...SOUND_FONT_INSTRUMENTS.map(item => item.name)].includes(String(data.selectedInstrument)) ? String(data.selectedInstrument) : 'Grand Piano')
             if (typeof data.prompt === 'string') setPrompt(data.prompt)
             if (typeof data.generationDuration === 'number' && Number.isFinite(data.generationDuration)) setGenerationDuration(Math.max(10, Math.min(180, Math.round(data.generationDuration / 10) * 10)))
@@ -435,7 +435,7 @@ export default function App() {
     } else if (/\b(enable|turn on|activate)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
       const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
       setEnabledEffects(old => old.map((value, index) => index === effectIndex ? true : value))
-      reply = 'Enabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay'][effectIndex] + ' for built-in playback.'
+      reply = 'Enabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'][effectIndex] + ' for built-in playback.'
     } else if (/\b(disable|turn off)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
       const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
       setEnabledEffects(old => old.map((value, index) => index === effectIndex ? false : value))
@@ -530,6 +530,25 @@ export default function App() {
       delay.delayTime.value = 60 / bpm / 2; feedback.gain.value = 0.28; wet.gain.value = 0.22
       output.connect(delay); delay.connect(wet).connect(ctx.destination); delay.connect(feedback).connect(delay)
       window.setTimeout(() => { delay.disconnect(); feedback.disconnect(); wet.disconnect() }, 2500)
+    }
+    if (effects[4]) {
+      const length = Math.max(1, Math.floor(ctx.sampleRate * 1.4))
+      const impulse = ctx.createBuffer(2, length, ctx.sampleRate)
+      for (let channel = 0; channel < 2; channel++) {
+        const data = impulse.getChannelData(channel)
+        for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.6)
+      }
+      const convolver = ctx.createConvolver(), wet = ctx.createGain()
+      convolver.buffer = impulse; wet.gain.value = 0.2
+      output.connect(convolver); convolver.connect(wet).connect(ctx.destination)
+      window.setTimeout(() => { convolver.disconnect(); wet.disconnect() }, 3500)
+    }
+    if (effects[5]) {
+      const delay = ctx.createDelay(0.06), lfo = ctx.createOscillator(), depth = ctx.createGain(), wet = ctx.createGain()
+      delay.delayTime.value = 0.025; lfo.frequency.value = 0.7; depth.gain.value = 0.008; wet.gain.value = 0.18
+      lfo.connect(depth).connect(delay.delayTime); output.connect(delay); delay.connect(wet).connect(ctx.destination)
+      lfo.start()
+      window.setTimeout(() => { try { lfo.stop() } catch {} delay.disconnect(); lfo.disconnect(); depth.disconnect(); wet.disconnect() }, 3500)
     }
   }
   const triggerDrum = (ctx: AudioContext, row: number) => {
@@ -1112,7 +1131,7 @@ export default function App() {
           {filteredInstruments.length===0&&instrumentSearch.trim()&&<div className="sampler-empty"><strong>No matching instrument</strong><p>Try a different name or category.</p></div>}
           <p className="mixer-note">Selected sound: <strong>{selectedInstrument}</strong>. {instrumentLoadMessage} The Windows installer bundles the 12 starter sample banks. First instrument playback still downloads the small WebAudioFont playback engine, so connect to the internet once before playing instruments. Sample data itself is local in the installed desktop build.</p>
         </section>}
-        {view==='Effects'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Effects</h2><p>Lightweight playback effects · enable or disable each effect</p></div></div></div>{['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay'].map((name,i)=><div className="effect-row" key={name}><div className="effect-icon"><SlidersHorizontal size={18}/></div><div className="effect-info"><strong>{name}</strong><span>{['Reduce very low frequencies in built-in sounds','Gently control peaks in built-in sounds','Add a quick echo to built-in sounds','Add rhythmic echoes synced to the current BPM'][i]}</span></div><span className="effect-tag">{['EQ','DYNAMICS','SPACE','TIME'][i]}</span><button className={enabledEffects[i]?'primary-button compact':'secondary-button compact'} aria-pressed={enabledEffects[i]} onClick={()=>{setEnabledEffects(old=>old.map((v,j)=>i===j?!v:v));notify(name+(enabledEffects[i]?' disabled.':' enabled for built-in playback.'))}}>{enabledEffects[i]?'On':'Off'}</button></div>)}</section>}
+        {view==='Effects'&&<section className="panel"><div className="panel-heading"><div className="panel-title"><div className="panel-icon cyan"><SlidersHorizontal size={16}/></div><div><h2>Effects Rack</h2><p>Realtime Web Audio effects for instruments and drum playback</p></div></div></div>{['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'].map((name,i)=><div className="effect-row" key={name}><div className="effect-icon"><SlidersHorizontal size={18}/></div><div className="effect-info"><strong>{name}</strong><span>{['Reduce sub-rumble below the main instrument range','Smooth peaks for a more controlled sound','Add a short slapback echo','Add rhythmic echoes synced to the current BPM','Add a generated room tail for more space','Add a subtle modulated layer for width and vocal thickening'][i]}</span></div><span className="effect-tag">{['EQ','DYNAMICS','SPACE','TIME','REVERB','CHORUS'][i]}</span><button className={enabledEffects[i]?'primary-button compact':'secondary-button compact'} aria-pressed={enabledEffects[i]} onClick={()=>{setEnabledEffects(old=>old.map((v,j)=>i===j?!v:v));notify(name+(enabledEffects[i]?' disabled.':' enabled for instrument and drum playback.'))}}>{enabledEffects[i]?'On':'Off'}</button></div>)}<div className="sampler-note"><Check size={15}/> These effects are active in the built-in instrument/drum playback path. Applying them to full imported audio and adding a true pitch-shifter are next audio-engine milestones.</div></section>}
         <div className="bottom-hint"><div className="hint-icon"><Sparkles size={15}/></div><div><strong>A little idea goes a long way.</strong><span>Start with a groove. Let the feeling lead.</span></div><button onClick={()=>setView('Reference Track')}>Try AI Reference Track <span>→</span></button></div>
       </main>
     </div>
