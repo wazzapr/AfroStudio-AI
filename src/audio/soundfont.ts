@@ -48,6 +48,7 @@ const DATA_URL = 'https://surikov.github.io/webaudiofontdata/sound/'
 const playerScripts = new Map<string, Promise<void>>()
 const players = new WeakMap<AudioContext, WebAudioFontPlayerInstance>()
 const loadedPresets = new WeakMap<AudioContext, Map<number, Promise<WebAudioFontPreset>>>()
+const readyPresets = new WeakMap<AudioContext, Set<number>>()
 
 function loadScript(url: string): Promise<void> {
   const existing = playerScripts.get(url)
@@ -108,7 +109,11 @@ export async function loadSoundFontInstrument(
         reject(error instanceof Error ? error : new Error('Could not load this instrument.'))
       }
     })
-    return (window as unknown as Record<string, WebAudioFontPreset>)[variableName]
+    const preset = (window as unknown as Record<string, WebAudioFontPreset>)[variableName]
+    let ready = readyPresets.get(context)
+    if (!ready) { ready = new Set(); readyPresets.set(context, ready) }
+    ready.add(instrument.program)
+    return preset
   })()
   contextPresets.set(instrument.program, promise)
   try {
@@ -117,6 +122,11 @@ export async function loadSoundFontInstrument(
     contextPresets.delete(instrument.program)
     throw error
   }
+}
+
+export function isSoundFontInstrumentReady(context: AudioContext, instrumentName: string): boolean {
+  const instrument = SOUND_FONT_INSTRUMENTS.find(item => item.name === instrumentName)
+  return Boolean(instrument && readyPresets.get(context)?.has(instrument.program))
 }
 
 export async function playSoundFontNote(
