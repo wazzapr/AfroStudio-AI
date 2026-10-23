@@ -143,7 +143,7 @@ async function createWindow() {
   if (isDev) {
     await window.loadURL('http://127.0.0.1:5173');
   } else {
-    await window.loadURL(desktopOrigin);
+    await window.loadURL(desktopOrigin + '?desktop=1');
   }
 }
 
