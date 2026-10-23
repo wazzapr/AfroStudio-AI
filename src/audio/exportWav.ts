@@ -1,3 +1,5 @@
+import { loadSoundFontInstrument, queueSoundFontNote, SOUND_FONT_INSTRUMENTS } from './soundfont'
+
 export type ExportNote = { id: number; step: number; pitch: number; duration?: number; velocity?: number }
 
 type ExportClip = { lane: number; duration: number; startBar?: number }
@@ -148,6 +150,9 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
   const duration = safeBars * 4 * 60 / safeBpm + noteTail
   const sampleRate = 44100
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate)
+  const sampledInstrument = SOUND_FONT_INSTRUMENTS.some(instrument => instrument.name === selectedInstrument)
+  const soundFontContext = ctx as unknown as AudioContext
+  if (sampledInstrument) await loadSoundFontInstrument(soundFontContext, selectedInstrument)
   const totalSteps = safeBars * 16
   if (referenceAudio && !mutedChannels[5] && !mutedChannels[0]) {
     const referenceClip = clips.find(clip => clip.lane === 2)
@@ -183,7 +188,16 @@ export async function exportArrangementWav({ bpm, master, steps, notes, clips, c
       if (!mutedChannels[3]) addBass(ctx, time, patternStep % 8 === 0 ? 0 : 3, effectiveMaster, channelLevels[2] ?? 100)
     }
     if (activeAt(3, bar)) {
-      if (!mutedChannels[4]) notes.filter(note => note.step === patternStep).forEach(note => addNote(ctx, time, note.pitch, effectiveMaster, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100, selectedInstrument))
+      if (!mutedChannels[4]) notes.filter(note => note.step === patternStep).forEach(note => {
+        if (sampledInstrument) {
+          const output = ctx.createGain()
+          output.gain.value = 1
+          output.connect(ctx.destination)
+          queueSoundFontNote(soundFontContext, selectedInstrument, output, 60 + note.pitch, (note.duration ?? 2) * secondsPerStep, Math.max(0, Math.min(1, effectiveMaster / 100)) * Math.max(0, Math.min(1, (channelLevels[3] ?? 100) / 100)) * Math.max(0, Math.min(1, (note.velocity ?? 100) / 127)) * 0.8, time)
+        } else {
+          addNote(ctx, time, note.pitch, effectiveMaster, channelLevels[3] ?? 100, (note.duration ?? 2) * secondsPerStep, note.velocity ?? 100, selectedInstrument)
+        }
+      })
     }
   }
 
