@@ -26,7 +26,7 @@ A Windows desktop build is now being added with Electron. The Windows Installer 
 - Not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - AI full-song generation from uploaded audio requires a compatible local model service; the bridge alone does not generate music.
 - Native VST3 plugin hosting, deep synth design comparable to Omnisphere/Nexus, additional downloadable sound packs, automation, advanced independent vocal pitch-shifting, and a low-latency desktop audio engine remain future milestones.
-- The Windows installer workflow downloads and bundles the 32 FluidR3 sample preset files locally. The small WebAudioFont playback-engine script is still loaded from its upstream host on first instrument use, so that first use needs internet. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine.
+- The Windows installer workflow downloads and bundles the 32 FluidR3 sample preset files locally. The small WebAudioFont playback-engine script is still loaded from its upstream host, so instrument playback needs internet whenever that engine is not already cached; offline playback is not guaranteed. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine.
 - The desktop installer bundles the studio interface and a standalone local bridge executable, so the bridge does not require a separate Python installation. It does not install an AI music-generation model, and the installer still needs testing on a real Windows PC.
 
 ## Try it on Windows
