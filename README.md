@@ -8,8 +8,8 @@ The project is an early, actively developed desktop-capable studio foundation. C
 
 - Playlist with draggable pattern/audio clips, transport, tempo control, and arrangement playback.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
-- A first sample-based instrument browser with 12 General MIDI SoundFont presets: grand/electric piano, nylon/steel guitar, acoustic/finger/synth bass, strings, trumpet, French horn, flute, and warm pad. Presets load from the WebAudioFont-hosted FluidR3 bank on first use and are used for Piano Roll playback and WAV export when loaded.
-- Channel Rack and Piano Roll editing, 32 real sample-based starter instruments (piano, electric piano, guitars, basses, strings, brass, flute and pad), searchable Instrument Rack, lightweight synth presets, starter playback effects, project save/load, and WAV arrangement export.
+- Channel Rack and Piano Roll editing, a searchable Instrument Rack with 32 sample-based General MIDI instruments (piano, electric piano, music box, marimba, organ, guitars, multiple basses, violin, cello, harp, strings, choir/voice, brass, saxophone, woodwinds, pads and world instruments), lightweight synth presets, project save/load, MIDI export and WAV arrangement export.
+- A six-effect rack with low-cut EQ, compressor, short echo, tempo delay, generated reverb and chorus/vocal-doubler processing for instruments, drums and imported-audio preview. A simple vocal pitch/speed control is included; it changes playback speed too and is not a studio-quality independent pitch shifter.
 - Local procedural Afro House idea generation. This is not a trained AI music-generation model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
 - Keyboard shortcuts for transport, navigation, undo/redo, duplication, save, and deleting selected items.
@@ -25,8 +25,8 @@ A Windows desktop build is now being added with Electron. The Windows Installer 
 
 - Not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - AI full-song generation from uploaded audio requires a compatible local model service; the bridge alone does not generate music.
-- Native VST3 plugin hosting, deep synth design comparable to Omnisphere/Nexus, large offline sample-library downloads, automation, and a low-latency desktop audio engine remain future milestones.
-- The new SoundFont instruments require internet on first load and are not yet bundled as an offline sound bank in the installer. Sound quality and WAV export still need testing on a real Windows machine. Built-in effects are currently basic playback processing, not a full vocal changer.
+- Native VST3 plugin hosting, deep synth design comparable to Omnisphere/Nexus, additional downloadable sound packs, automation, advanced independent vocal pitch-shifting, and a low-latency desktop audio engine remain future milestones.
+- The Windows installer workflow downloads and bundles the 32 FluidR3 sample preset files locally. The small WebAudioFont playback-engine script is still loaded from its upstream host on first instrument use, so that first use needs internet. Sound quality, exported WAV results and audio routing still need testing on a real Windows machine.
 - The desktop installer bundles the studio interface and a standalone local bridge executable, so the bridge does not require a separate Python installation. It does not install an AI music-generation model, and the installer still needs testing on a real Windows PC.
 
 ## Try it on Windows
