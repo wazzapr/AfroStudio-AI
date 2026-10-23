@@ -23,7 +23,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path 'public/soundfonts' | Out-Null
-          $programs = @(0, 4, 24, 25, 32, 33, 38, 48, 56, 60, 73, 89)
+          $programs = @(0, 4, 10, 12, 19, 24, 25, 29, 32, 33, 35, 36, 38, 40, 42, 46, 48, 50, 52, 53, 54, 56, 60, 62, 64, 68, 71, 73, 75, 89, 104, 107)
           foreach ($program in $programs) {
             $suffix = ($program * 10).ToString('D4')
             $file = "${suffix}_FluidR3_GM_sf2_file.js"
