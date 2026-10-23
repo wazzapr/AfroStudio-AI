@@ -1,0 +1,83 @@
+name: Windows installer
+
+on:
+  push:
+    branches: ["feat/studio-foundation"]
+  workflow_dispatch:
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Bundle local sample playback engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'public/vendor' | Out-Null
+          $playerPath = 'public/vendor/WebAudioFontPlayer.js'
+          Invoke-WebRequest -Uri 'https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js' -OutFile $playerPath
+          if ((Get-Item $playerPath).Length -lt 10000) {
+            throw 'Downloaded WebAudioFontPlayer.js looks incomplete.'
+          }
+      - name: Bundle starter instrument sample banks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'public/soundfonts' | Out-Null
+          $programs = @(0, 4, 10, 12, 19, 24, 25, 29, 32, 33, 35, 36, 38, 40, 42, 46, 48, 50, 52, 53, 54, 56, 60, 62, 64, 68, 71, 73, 75, 89, 104, 107)
+          foreach ($program in $programs) {
+            $suffix = ($program * 10).ToString('D4')
+            $file = "${suffix}_FluidR3_GM_sf2_file.js"
+            $url = "https://surikov.github.io/webaudiofontdata/sound/$file"
+            Write-Host "Downloading bundled instrument: $file"
+            Invoke-WebRequest -Uri $url -OutFile (Join-Path 'public/soundfonts' $file)
+            if ((Get-Item (Join-Path 'public/soundfonts' $file)).Length -lt 1000) {
+              throw "Downloaded instrument preset looks incomplete: $file"
+            }
+          }
+      - name: Set up Python for bundling the local bridge
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pyinstaller
+      - name: Bundle local bridge executable
+        run: pyinstaller --noconfirm --clean --onefile --name AfroStudioLocalEngine --distpath release-engine local-engine/server.py
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Windows installer
+        run: npm run build && npx electron-builder --win nsis --publish never
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AfroStudio-AI-Windows-Installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish rolling nightly installer release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: AfroStudio AI Nightly
+          body: |
+            Automated development build of AfroStudio AI for Windows.
+
+            This is a pre-release for testing. Back up your projects before updating.
+            The installer includes the desktop app and local bridge, but does not include an AI model.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: release/*.exe
