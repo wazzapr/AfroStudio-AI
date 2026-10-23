@@ -170,7 +170,7 @@ export default function App() {
     const saveOnPageHide = () => {
       try {
         const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+        const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, vocalPitchSemitones, rowSampleNames, rowSampleIds }
         window.localStorage.setItem('afrostudio-project-autosave-v1', JSON.stringify(data))
       } catch {
         // Closing the tab must never be blocked by storage failures.
@@ -178,7 +178,7 @@ export default function App() {
     }
     window.addEventListener('pagehide', saveOnPageHide)
     return () => window.removeEventListener('pagehide', saveOnPageHide)
-  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleIds, drumSamples, sampleStorageReady])
+  }, [bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, vocalPitchSemitones, rowSampleIds, drumSamples, sampleStorageReady])
   useEffect(() => {
     let cancelled = false
     const restoreSamples = async () => {
@@ -1054,7 +1054,7 @@ export default function App() {
   }
   const saveProject = () => {
     const rowSampleNames = rowSampleIds.map(id => drumSamples.find(sample => sample.id === id)?.name ?? '')
-    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, rowSampleNames, rowSampleIds }
+    const data = { app: 'AfroStudio AI', version: '0.1.0', bpm, clips, steps, notes, referenceName, master, channelLevels, mutedChannels, prompt, generationDuration, generationElements, grooveAmount, styleInfluence, originalityAmount, enabledEffects, selectedInstrument, vocalPitchSemitones, rowSampleNames, rowSampleIds }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = document.createElement('a'); a.href = url; a.download = 'afrostudio-project.json'; a.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
