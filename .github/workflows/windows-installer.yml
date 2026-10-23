@@ -74,7 +74,6 @@ jobs:
           name: AfroStudio AI Nightly
           body: |
             Automated development build of AfroStudio AI for Windows.
-          files: release/*.exe
 
             This is a pre-release for testing. Back up your projects before updating.
             The installer includes the desktop app and local bridge, but does not include an AI model.
