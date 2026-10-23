@@ -4,10 +4,11 @@ A free-first, Windows-focused music production studio inspired by familiar DAW w
 
 ## Current milestone
 
-The project is an early, actively developed browser-based studio foundation. Current features include:
+The project is an early, actively developed desktop-capable studio foundation. Current features include:
 
 - Playlist with draggable pattern/audio clips, transport, tempo control, and arrangement playback.
 - Local browser audio playback for synthesized drum patterns, bass/melody notes, and an imported reference track.
+- A first sample-based instrument browser with 12 General MIDI SoundFont presets: grand/electric piano, nylon/steel guitar, acoustic/finger/synth bass, strings, trumpet, French horn, flute, and warm pad. Presets load from the WebAudioFont-hosted FluidR3 bank on first use and are used for Piano Roll playback and WAV export when loaded.
 - Channel Rack and Piano Roll editing, lightweight synth presets, starter playback effects, project save/load, and WAV arrangement export.
 - Local procedural Afro House idea generation. This is not a trained AI music-generation model.
 - Experimental local reference-audio analysis and an optional local Python bridge for a separately running ACE-Step API.
@@ -24,7 +25,8 @@ A Windows desktop build is now being added with Electron. The Windows Installer 
 
 - Not yet a replacement for FL Studio; audio scheduling and the interface still need further development and testing.
 - AI full-song generation from uploaded audio requires a compatible local model service; the bridge alone does not generate music.
-- VST3/plugin hosting, sample library management, automation, and a low-latency desktop audio engine remain future milestones.
+- Native VST3 plugin hosting, deep synth design comparable to Omnisphere/Nexus, large offline sample-library downloads, automation, and a low-latency desktop audio engine remain future milestones.
+- The new SoundFont instruments require internet on first load and are not yet bundled as an offline sound bank in the installer. Sound quality and WAV export still need testing on a real Windows machine. Built-in effects are currently basic playback processing, not a full vocal changer.
 - The desktop installer bundles the studio interface and a standalone local bridge executable, so the bridge does not require a separate Python installation. It does not install an AI music-generation model, and the installer still needs testing on a real Windows PC.
 
 ## Try it on Windows
