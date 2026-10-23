@@ -515,12 +515,12 @@ export default function App() {
     } else if (/\b(make|generate|create)\b.*\b(afro house|groove|starting idea|beat|pattern)\b/.test(lower)) {
       generateAfroHouseIdea()
       reply = 'Created an editable local Afro House starting idea. I updated the Channel Rack steps, Piano Roll notes and Playlist clips where selected. This is procedural generation, not a full AI audio remix.'
-    } else if (/\b(enable|turn on|activate)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
-      const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
+    } else if (/\b(enable|turn on|activate)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|reverb|chorus|vocal doubler|effect)\b/.test(lower)) {
+      const effectIndex = /\b(reverb|room)\b/.test(lower) ? 4 : /\b(chorus|vocal doubler|thicken)\b/.test(lower) ? 5 : /\b(short echo|slapback)\b/.test(lower) ? 2 : /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
       setEnabledEffects(old => old.map((value, index) => index === effectIndex ? true : value))
-      reply = 'Enabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'][effectIndex] + ' for built-in playback.'
-    } else if (/\b(disable|turn off)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|effect)\b/.test(lower)) {
-      const effectIndex = /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
+      reply = 'Enabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'][effectIndex] + ' for instrument, drum, and imported-audio preview playback.'
+    } else if (/\b(disable|turn off)\b/.test(lower) && /\b(delay|echo|eq|compressor|compression|reverb|chorus|vocal doubler|effect)\b/.test(lower)) {
+      const effectIndex = /\b(reverb|room)\b/.test(lower) ? 4 : /\b(chorus|vocal doubler|thicken)\b/.test(lower) ? 5 : /\b(short echo|slapback)\b/.test(lower) ? 2 : /\b(delay|echo)\b/.test(lower) ? 3 : /\b(eq|low.cut)\b/.test(lower) ? 0 : 1
       setEnabledEffects(old => old.map((value, index) => index === effectIndex ? false : value))
       reply = 'Disabled ' + ['Low-cut EQ','Warm Compressor','Short Echo','Tempo Delay','Studio Reverb','Chorus / Vocal Doubler'][effectIndex] + '.'
     } else if (/\b(add|create)\b.*\b(clip|track|pattern)\b/.test(lower)) {
