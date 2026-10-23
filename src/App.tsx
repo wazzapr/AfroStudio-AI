@@ -608,9 +608,10 @@ export default function App() {
       if (!response.ok || !result.available || !Array.isArray(result.commands) || result.commands.length === 0) {
         throw new Error(result.message || 'The local model did not return any actions.')
       }
+      const actions = result.commands.slice(0, 6)
       setLocalModelStatus('online')
-      setAssistantMessages(old => [...old, { role: 'assistant', text: 'Local model ' + (result.model || 'Ollama') + ' planned ' + result.commands.length + ' studio action(s). I will execute only supported studio commands.' }])
-      result.commands.slice(0, 6).forEach(action => runStudioCommand(action, true))
+      setAssistantMessages(old => [...old, { role: 'assistant', text: 'Local model ' + (result.model || 'Ollama') + ' planned ' + actions.length + ' studio action(s). I will execute only supported studio commands.' }])
+      actions.forEach(action => runStudioCommand(action, true))
     } catch (error) {
       setLocalModelStatus('offline')
       const reason = error instanceof Error ? error.message : 'The local model could not be reached.'
